@@ -129,6 +129,11 @@ def _download_entry(entry: CatalogEntry) -> Path:
         html = fetch.fetch_text(entry.page_url)
         data_url, codebook_url = catalog.extract_resource_links(html, entry.page_url)
         if data_url is None:
+            if catalog.has_csv_link(html, entry.page_url):
+                raise NotFoundError(
+                    f"Round {entry.round} only offers CSV data at {entry.page_url}; "
+                    "CSV is not supported in v1 (SAV or DTA is required)"
+                )
             raise NotFoundError(
                 f"No downloadable data file found for round {entry.round} at {entry.page_url}"
             )

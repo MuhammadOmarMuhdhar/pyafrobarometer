@@ -191,3 +191,43 @@ def test_unknown_country_raises(tmp_path):
     write_sav(p)
     with pytest.raises(ab.NotFoundError):
         ab.load(rounds=9, countries=["Atlantis"], source=p, harmonize=True)
+
+
+def test_countries_falls_back_to_catalog_country_entries(monkeypatch):
+    empty = pd.DataFrame(
+        columns=[
+            "name",
+            "label",
+            "round",
+            "kind",
+            "family",
+            "source_var",
+            "value_labels",
+        ]
+    )
+    monkeypatch.setattr("pyafrobarometer.search.load_index", lambda: empty)
+    monkeypatch.setattr(
+        "pyafrobarometer.api.resolve_catalog",
+        lambda **kw: [
+            _entry(kind="country", country="Ghana", round=9),
+            _entry(kind="country", country="Benin", round=9),
+        ],
+    )
+    assert ab.countries(9) == ["Benin", "Ghana"]
+
+
+def test_country_load_with_only_csv_raises(monkeypatch):
+    entry = _entry(
+        kind="country",
+        country="South Africa",
+        data_url="https://www.afrobarometer.org/survey-resource/south-africa-round-10-data-2026/",
+        page_url="https://www.afrobarometer.org/survey-resource/south-africa-round-10-data-2026/",
+        filename="south-africa-round-10-data-2026",
+    )
+    html = (
+        '<a href="https://www.afrobarometer.org/wp-content/uploads/SAF_R10.csv">'
+        "Download CSV</a>"
+    )
+    monkeypatch.setattr("pyafrobarometer.fetch.fetch_text", lambda *a, **k: html)
+    with pytest.raises(ab.NotFoundError, match="CSV"):
+        api._download_entry(entry)

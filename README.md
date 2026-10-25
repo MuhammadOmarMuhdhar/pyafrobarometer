@@ -58,10 +58,9 @@ returns a copy; mutating it never mutates the dataset.
 ## Rounds, countries, and availability
 
 - Merged rounds 1–10 are supported, and the baked manifest covers all ten.
-  Country-level discovery reads the first data-sets listing page and supports
-  `.sav`/`.zip`/`.dta` links; paginated listings and CSV-only country pages are
-  not supported in v1, so unavailable country data raises `NotFoundError`
-  rather than guessing a URL.
+  Country-level discovery reads every data-sets listing page and supports
+  `.sav`/`.zip`/`.dta` links. CSV-only country pages raise a clear
+  `NotFoundError` because CSV is not supported in v1.
 - Canonical variables (`country`, `respondent_id`, `weight`, `region`,
   `urban_rural`, `age`, `gender`, `education`, `interview_date`) are mapped per
   round from a curated YAML crosswalk. A mapping that cannot be verified is
@@ -100,10 +99,8 @@ ab.search_variables("trust president", rounds=[8, 9], limit=10)
 
 With `rapidfuzz` installed (`[search]` extra), matching is fuzzy; otherwise it is
 case-insensitive substring matching. Search reads the shipped
-`metadata_index.json`, which the weekly catalog job regenerates from downloaded
-metadata. The repository ships it empty for v1; run
-`python scripts/update_catalog.py --write --metadata-rounds all` to populate it.
-Search never downloads a dataset.
+`metadata_index.json`, populated for merged rounds 1–10 and refreshed by the
+weekly catalog job. Search never downloads a dataset.
 
 ## Codebooks
 

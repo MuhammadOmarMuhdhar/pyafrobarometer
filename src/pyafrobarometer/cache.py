@@ -91,6 +91,35 @@ def _lock_path(url: str) -> Path:
     return cache_file(f"locks/{digest}.lock")
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _lock_is_stale(path: Path) -> bool:
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    try:
+        pid = int(raw.splitlines()[0])
+    except (IndexError, ValueError):
+        pid = -1
+    if pid > 0:
+        return not _pid_alive(pid)
+    try:
+        return time.time() - path.stat().st_mtime > 3600
+    except OSError:
+        return False
+
+
 @contextmanager
 def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
     path = _lock_path(url)
@@ -99,6 +128,9 @@ def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
         try:
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
+            if _lock_is_stale(path):
+                path.unlink(missing_ok=True)
+                continue
             if time.monotonic() >= deadline:
                 raise CacheError(
                     f"Timed out after {timeout}s waiting for the download lock for {url}"

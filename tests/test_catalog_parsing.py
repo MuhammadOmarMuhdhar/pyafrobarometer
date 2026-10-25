@@ -71,3 +71,34 @@ def test_parse_live_country_card_text():
     entries = catalog.parse_country_index(html, BASE)
     assert entries and entries[0].country == "South Africa"
     assert entries[0].round == 10 and entries[0].year == 2026
+
+
+def test_country_index_follows_pagination(monkeypatch):
+    page1 = (
+        '<li><a class="c-list-item__button" title="South Africa Round 10 data (2026)" '
+        'href="/survey-resource/south-africa-round-10-data-2026/">Data set South Africa '
+        "Round 10 data (2026)</a></li>"
+        '<a href="/data/data-sets/?current-page=2#listing">2</a>'
+    )
+    page2 = (
+        '<li><a class="c-list-item__button" title="Eswatini Round 10 data (2025)" '
+        'href="/survey-resource/eswatini-round-10-data-2025/">Data set Eswatini '
+        "Round 10 data (2025)</a></li>"
+    )
+
+    def fake_fetch(url, *args, **kwargs):
+        return page2 if "current-page=2" in url else page1
+
+    monkeypatch.setattr(catalog, "fetch_text", fake_fetch)
+    entries = catalog._fetch_country_index()
+    assert {entry.country for entry in entries} == {"South Africa", "Eswatini"}
+
+
+def test_country_index_raises_when_cards_do_not_parse(monkeypatch):
+    html = (
+        '<a class="c-list-item__button" title="South Africa Round Ten data (2026)" '
+        'href="/survey-resource/south-africa-round-10-data-2026/">Data set</a>'
+    )
+    monkeypatch.setattr(catalog, "fetch_text", lambda *a, **k: html)
+    with pytest.raises(CatalogError):
+        catalog._fetch_country_index()

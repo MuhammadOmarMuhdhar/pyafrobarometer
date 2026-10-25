@@ -49,15 +49,37 @@ class CatalogEntry:
     size_bytes: int | None
 
 
-def _anchors(html: str) -> list[tuple[str, str]]:
+def _anchors(html: str, *, use_title: bool = False) -> list[tuple[str, str]]:
     soup = BeautifulSoup(html, "html.parser")
     found: list[tuple[str, str]] = []
     for anchor in soup.select(SELECTORS["anchors"]):
         href = anchor.get("href")
         if not isinstance(href, str) or not href:
             continue
-        found.append((anchor.get_text(" ", strip=True), href))
+        title = anchor.get("title")
+        if use_title and isinstance(title, str) and title.strip():
+            text = title.strip()
+        else:
+            text = anchor.get_text(" ", strip=True)
+        found.append((text, href))
     return found
+
+
+def _last_listing_page(html: str) -> int:
+    pages = [int(match.group(1)) for match in re.finditer(r"current-page=(\d+)", html)]
+    return max(pages) if pages else 1
+
+
+def _has_country_cards(html: str) -> bool:
+    soup = BeautifulSoup(html, "html.parser")
+    for anchor in soup.select("a.c-list-item__button[title]"):
+        title = anchor.get("title")
+        if not isinstance(title, str):
+            continue
+        lowered = title.casefold()
+        if " round " in f" {lowered} " and "merged" not in lowered:
+            return True
+    return False
 
 
 def _resolve_url(base_url: str, href: str) -> str:
@@ -131,7 +153,7 @@ def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
 
 def parse_country_index(html: str, base_url: str) -> list[CatalogEntry]:
     entries: list[CatalogEntry] = []
-    for text, href in _anchors(html):
+    for text, href in _anchors(html, use_title=True):
         title = text.strip()
         if title.casefold().startswith("data set "):
             title = title[9:]
@@ -154,6 +176,13 @@ def parse_country_index(html: str, base_url: str) -> list[CatalogEntry]:
             )
         )
     return entries
+
+
+def has_csv_link(html: str, base_url: str) -> bool:
+    for _, href in _anchors(html):
+        if urlparse(_resolve_url(base_url, href)).path.lower().endswith(".csv"):
+            return True
+    return False
 
 
 def extract_resource_links(html: str, base_url: str) -> tuple[str | None, str | None]:
@@ -280,11 +309,35 @@ def _follow_resource_page(entry: CatalogEntry) -> CatalogEntry:
     )
 
 
+def _fetch_country_index() -> list[CatalogEntry]:
+    first = fetch_text(DATASETS_INDEX_URL)
+    last_page = _last_listing_page(first)
+    entries = parse_country_index(first, DATASETS_INDEX_URL)
+    saw_cards = _has_country_cards(first)
+    for page in range(2, last_page + 1):
+        url = f"{DATASETS_INDEX_URL}?current-page={page}"
+        html = fetch_text(url)
+        entries.extend(parse_country_index(html, url))
+        saw_cards = saw_cards or _has_country_cards(html)
+    if saw_cards and not entries:
+        raise CatalogError(
+            "The data-sets page contains listing cards but none could be parsed"
+        )
+    seen: set[tuple[int, str | None, str, str]] = set()
+    unique: list[CatalogEntry] = []
+    for entry in entries:
+        key = (entry.round, entry.country, entry.language, entry.data_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(entry)
+    return unique
+
+
 def _fetch_catalog() -> list[CatalogEntry]:
     merged_html = fetch_text(MERGED_INDEX_URL)
-    country_html = fetch_text(DATASETS_INDEX_URL)
     entries = parse_merged_index(merged_html, MERGED_INDEX_URL)
-    entries.extend(parse_country_index(country_html, DATASETS_INDEX_URL))
+    entries.extend(_fetch_country_index())
     entries = [
         _follow_resource_page(entry) if entry.kind == "merged" else entry
         for entry in entries

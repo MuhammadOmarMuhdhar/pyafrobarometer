@@ -48,3 +48,12 @@ def test_limit_and_sorting():
 def test_no_match_returns_empty_frame():
     out = search.search_variables("zzzz", index=INDEX, fuzzy=False)
     assert out.empty and "name" in out.columns
+
+
+def test_shipped_index_is_populated():
+    assert not search.load_index().empty
+
+
+def test_search_finds_known_variable():
+    out = search.search_variables("trust president", rounds=[9], fuzzy=False)
+    assert "Q37A" in set(out["name"])

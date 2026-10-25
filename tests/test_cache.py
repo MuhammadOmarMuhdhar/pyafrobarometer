@@ -52,3 +52,16 @@ def test_clear_cache_by_round(tmp_path, monkeypatch):
     cache.clear_cache(9)
     assert not f.exists() and not m.exists()
     assert cache.read_state()["files"] == {}
+
+
+def test_stale_lock_is_recovered(tmp_path, monkeypatch):
+    import hashlib
+
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path))
+    url = "https://example.test/stale"
+    lock = cache.cache_file(
+        f"locks/{hashlib.sha256(url.encode()).hexdigest()}.lock"
+    )
+    lock.write_text("9999999")
+    with cache.url_lock(url, timeout=0.5):
+        pass
