@@ -265,3 +265,97 @@ def test_zip_extraction_uses_a_lock(monkeypatch, tmp_path):
     path = api._download_entry(entry)
     assert path.name == "data.sav"
     assert any(url.endswith("#extract") for url in locks)
+
+
+def test_rounds_populates_country_count(monkeypatch):
+    monkeypatch.setattr(
+        "pyafrobarometer.api.resolve_catalog",
+        lambda **kw: [_entry(countries_count=38)],
+    )
+    assert ab.rounds()["countries"].iloc[0] == 38
+
+
+def test_citation_includes_years(monkeypatch):
+    monkeypatch.setattr(
+        "pyafrobarometer.api.resolve_catalog",
+        lambda **kw: [_entry(round=9, year=2023)],
+    )
+    assert "2023" in ab.citation(rounds=[9])
+
+
+def test_load_uses_usecols(monkeypatch, tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    captured = {}
+    original = api.io.read_frame
+
+    def spy(path, **kwargs):
+        captured["usecols"] = kwargs.get("usecols")
+        return original(path, **kwargs)
+
+    monkeypatch.setattr(api.io, "read_frame", spy)
+    ab.load(rounds=9, source=p, variables=["Q37A"])
+    assert captured["usecols"] is not None
+    assert "Q37A" in captured["usecols"] and "COUNTRY" in captured["usecols"]
+    assert "Q100" not in captured["usecols"]
+
+
+def test_metadata_is_cached_by_sha(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path / "cache"))
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    calls = []
+    original = api.io.read_metadata
+
+    def spy(path):
+        calls.append(path)
+        return original(path)
+
+    monkeypatch.setattr(api.io, "read_metadata", spy)
+    ab.load(rounds=9, source=p)
+    ab.load(rounds=9, source=p)
+    assert len(calls) == 1
+
+
+def test_country_alias_matches(monkeypatch, tmp_path):
+    p = tmp_path / "r9.sav"
+    df = pd.DataFrame(
+        {
+            "COUNTRY": [3, 14],
+            "RESPNO": ["A", "B"],
+            "REGION": [1, 2],
+            "URBRUR": [1, 2],
+            "Q1": [30, 40],
+            "Q100": [1, 2],
+            "Q94": [3, 4],
+            "DATEINTR": [1, 2],
+            "Q37A": [0, 9],
+            "withinwt_ea": [1.0, 2.0],
+        }
+    )
+    pyreadstat.write_sav(
+        df,
+        str(p),
+        column_labels=list(df.columns),
+        variable_value_labels={"COUNTRY": {3: "Côte d'Ivoire", 14: "Ghana"}},
+    )
+    ds = ab.load(rounds=9, countries=["Cote d Ivoire"], source=p, harmonize=True)
+    assert ds.to_pandas()["country"].tolist() == ["Côte d'Ivoire"]
+
+
+def test_country_filter_uses_merged_entry(monkeypatch, tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    merged = _entry()
+    country = _entry(kind="country", country="Ghana")
+    monkeypatch.setattr("pyafrobarometer.api.resolve_catalog", lambda **kw: [merged, country])
+    seen = []
+
+    def fake_download(entry):
+        seen.append(entry)
+        return p
+
+    monkeypatch.setattr("pyafrobarometer.api._download_entry", fake_download)
+    ds = ab.load(rounds=9, countries=["Ghana"], harmonize=True)
+    assert seen and seen[0].kind == "merged"
+    assert ds.countries == ["Ghana"]

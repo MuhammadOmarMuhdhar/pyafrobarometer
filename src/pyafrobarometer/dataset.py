@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -10,6 +10,7 @@ import pandas as pd
 
 from pyafrobarometer import metadata
 from pyafrobarometer.errors import CodebookError, HarmonizationError
+from pyafrobarometer.names import normalize_country
 
 
 @dataclass(frozen=True)
@@ -118,27 +119,35 @@ class Dataset:
         columns: str | list[str] | None = None,
     ) -> Dataset:
         frame = self._df.copy()
+        provenance = self.provenance
         if countries is not None:
-            wanted = [countries] if isinstance(countries, str) else list(countries)
-            lowered = {name.casefold() for name in wanted}
+            requested = [countries] if isinstance(countries, str) else list(countries)
+            wanted = {normalize_country(name) for name in requested}
             if "country" in frame.columns:
                 keys = frame["country"]
             elif "COUNTRY" in frame.columns:
                 keys = metadata.decode_column(
                     frame["COUNTRY"], metadata.value_labels(self._meta, "COUNTRY")
                 )
+            elif "COUNTRY_ALPHA" in frame.columns:
+                keys = frame["COUNTRY_ALPHA"]
             else:
                 raise HarmonizationError(
                     "No country column is available; load with harmonize=True to filter countries"
                 )
-            frame = frame[keys.astype(str).str.casefold().isin(lowered)]
+            mask = keys.map(
+                lambda value: normalize_country(value) if pd.notna(value) else ""
+            ).isin(wanted)
+            matched = list(dict.fromkeys(keys[mask].astype(str).tolist()))
+            provenance = replace(provenance, countries=tuple(matched))
+            frame = frame[mask]
         if columns is not None:
             selected = [columns] if isinstance(columns, str) else list(columns)
             frame = frame[selected]
         return Dataset(
             frame,
             variables=self._variables,
-            provenance=self.provenance,
+            provenance=provenance,
             meta=self._meta,
             source_map=self._source_map,
             harmonized=self.harmonized,
@@ -183,6 +192,7 @@ class Dataset:
 
     def __repr__(self) -> str:
         return (
-            f"<Dataset rounds={self.rounds} rows={len(self._df)} "
-            f"columns={len(self._df.columns)} harmonized={self.harmonized}>"
+            f"<Dataset rounds={self.rounds} countries={self.countries} "
+            f"rows={len(self._df)} columns={len(self._df.columns)} "
+            f"harmonized={self.harmonized}>"
         )

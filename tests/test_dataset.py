@@ -130,3 +130,27 @@ def test_dataset_codebook_uses_provenance(monkeypatch, tmp_path):
     )
     assert ds.codebook() == target
     assert called == ["https://www.afrobarometer.org/cb.pdf"]
+
+
+def test_repr_includes_countries():
+    assert "Benin" in repr(make())
+
+
+def test_subset_understands_country_alpha_and_updates_provenance():
+    df = pd.DataFrame({"COUNTRY_ALPHA": ["Ghana", "Benin"], "Q37A": [0, 9]})
+    prov = Provenance(
+        ("https://www.afrobarometer.org/x.sav",),
+        "2026-10-25T00:00:00Z",
+        (5,),
+        ("Ghana", "Benin"),
+        "en",
+    )
+    ds = Dataset(
+        df,
+        variables=metadata.variable_info(META),
+        provenance=prov,
+        meta=META,
+    )
+    out = ds.subset(countries=["Ghana"])
+    assert out.to_pandas()["COUNTRY_ALPHA"].tolist() == ["Ghana"]
+    assert out.countries == ["Ghana"]

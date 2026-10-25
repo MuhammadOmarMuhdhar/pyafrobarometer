@@ -124,3 +124,9 @@ def test_concurrent_downloads_run_once(tmp_path, monkeypatch):
     for thread in threads:
         thread.join()
     assert len(calls) == 1 and len(results) == 2
+
+
+def test_download_rejects_zero_byte_body(tmp_path, monkeypatch):
+    install(monkeypatch, "get", [response(200, b"", {"content-type": "application/x-spss-sav"})])
+    with pytest.raises(DownloadError):
+        fetch.download(URL + "/a.sav", tmp_path / "a.sav")

@@ -25,8 +25,10 @@ SELECTORS: dict[str, str] = {
 }
 
 MERGED_TITLE = re.compile(
-    r"Merged Round (?P<round>\d+) data \(\d+ countries?\) \((?P<year>\d{4})(?:-\d{4})?\)"
+    r"Merged Round (?P<round>\d+) data \((?P<count>\d+) countries?\) "
+    r"\((?P<year>\d{4})(?:-\d{4})?\)"
 )
+FRENCH_COUNT = re.compile(r"\((\d+) pays?\)")
 FRENCH_TITLE = re.compile(r"S[ée]rie (?P<round>\d+)")
 COUNTRY_TITLE = re.compile(
     r"^(?P<country>.+?) Round (?P<round>\d+) data \((?P<year>\d{4})\)"
@@ -47,6 +49,7 @@ class CatalogEntry:
     page_url: str
     filename: str
     size_bytes: int | None
+    countries_count: int | None = None
 
 
 def _anchors(html: str, *, use_title: bool = False) -> list[tuple[str, str]]:
@@ -120,9 +123,11 @@ def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
         url = _resolve_url(base_url, href)
         filename = _filename(url)
         match = MERGED_TITLE.search(text)
+        count: int | None = None
         if match:
             round_number = int(match.group("round"))
             year = int(match.group("year"))
+            count = int(match.group("count"))
         else:
             french = FRENCH_TITLE.search(text)
             years = re.findall(r"\((\d{4})\)", text)
@@ -130,6 +135,8 @@ def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
                 continue
             round_number = int(french.group("round"))
             year = int(years[-1])
+            count_match = FRENCH_COUNT.search(text)
+            count = int(count_match.group(1)) if count_match else None
         entries.append(
             CatalogEntry(
                 kind="merged",
@@ -142,6 +149,7 @@ def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
                 page_url=url,
                 filename=filename,
                 size_bytes=None,
+                countries_count=count,
             )
         )
     if not entries:

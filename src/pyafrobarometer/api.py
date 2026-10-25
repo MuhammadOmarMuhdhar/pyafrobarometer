@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 import warnings
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -19,6 +21,7 @@ from pyafrobarometer.codebook import extract_text as extract_pdf_text
 from pyafrobarometer.codebook import get_codebook
 from pyafrobarometer.dataset import Dataset, Provenance
 from pyafrobarometer.errors import (
+    AfrobarometerError,
     HarmonizationError,
     NotFoundError,
 )
@@ -29,6 +32,7 @@ from pyafrobarometer.harmonize.crosswalk import (
     family_map,
 )
 from pyafrobarometer.harmonize.panel import concat_frames
+from pyafrobarometer.names import normalize_country
 
 ROUND_COLUMNS = ["round", "year", "countries", "data_url", "codebook_url", "language"]
 
@@ -85,13 +89,25 @@ def _cached_file(url: str) -> Path | None:
     return path
 
 
-def _remember_file(url: str, path: Path, *, sha256: str, round_number: int | None) -> None:
-    record = {
+def _remember_file(
+    url: str,
+    path: Path,
+    *,
+    sha256: str,
+    round_number: int | None,
+    archive: Path | None = None,
+    extract_dir: Path | None = None,
+) -> None:
+    record: dict[str, Any] = {
         "path": str(path),
         "sha256": sha256,
         "size": path.stat().st_size,
         "round": round_number,
     }
+    if archive is not None:
+        record["archive"] = str(archive)
+    if extract_dir is not None:
+        record["extract_dir"] = str(extract_dir)
 
     def update(state: dict[str, Any]) -> None:
         files = state.get("files")
@@ -103,14 +119,14 @@ def _remember_file(url: str, path: Path, *, sha256: str, round_number: int | Non
     cache.mutate_state(update)
 
 
-def _extract_archive(url: str, dest: Path, digest: str) -> Path:
+def _extract_archive(url: str, dest: Path, digest: str) -> tuple[Path, Path]:
     extract_dir = dest.parent / f"extracted-{digest}"
     with cache.url_lock(url + "#extract"):
         if extract_dir.exists():
             existing = sorted(extract_dir.rglob("*.sav"))
             if existing:
-                return existing[0]
-        return io.safe_extract_sav(dest, extract_dir)
+                return existing[0], extract_dir
+        return io.safe_extract_sav(dest, extract_dir), extract_dir
 
 
 def _download_url(url: str) -> Path:
@@ -122,9 +138,19 @@ def _download_url(url: str) -> Path:
     dest = cache.cache_file(f"files/{digest}-{filename}")
     result = fetch.download(url, dest)
     path = dest
+    archive: Path | None = None
+    extract_dir: Path | None = None
     if filename.lower().endswith(".zip"):
-        path = _extract_archive(url, dest, digest)
-    _remember_file(url, path, sha256=result.sha256, round_number=None)
+        archive = dest
+        path, extract_dir = _extract_archive(url, dest, digest)
+    _remember_file(
+        url,
+        path,
+        sha256=result.sha256,
+        round_number=None,
+        archive=archive,
+        extract_dir=extract_dir,
+    )
     return path
 
 
@@ -164,10 +190,18 @@ def _download_entry(entry: CatalogEntry) -> Path:
     dest = cache.cache_file(f"files/{digest}-{filename}")
     result = fetch.download(entry.data_url, dest)
     path = dest
+    archive = None
+    extract_dir = None
     if filename.lower().endswith(".zip"):
-        path = _extract_archive(entry.data_url, dest, digest)
+        archive = dest
+        path, extract_dir = _extract_archive(entry.data_url, dest, digest)
     _remember_file(
-        entry.data_url, path, sha256=result.sha256, round_number=entry.round
+        entry.data_url,
+        path,
+        sha256=result.sha256,
+        round_number=entry.round,
+        archive=archive,
+        extract_dir=extract_dir,
     )
     return path
 
@@ -193,6 +227,78 @@ def _unique_countries(frame: pd.DataFrame, meta: dict[str, Any]) -> list[str]:
     return [str(value) for value in pd.unique(values)]
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _metadata_for(path: Path, round_number: int | None) -> dict[str, Any]:
+    if round_number is None:
+        return io.read_metadata(path)
+    digest = _file_sha256(path)
+    cache_path = cache.cache_file(f"metadata/round-{round_number}.json")
+    if cache_path.exists():
+        try:
+            payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = None
+        if (
+            isinstance(payload, dict)
+            and payload.get("sha256") == digest
+            and isinstance(payload.get("meta"), dict)
+        ):
+            return cast(dict[str, Any], payload["meta"])
+    meta = io.read_metadata(path)
+    try:
+        fd, tmp_name = tempfile.mkstemp(
+            dir=cache_path.parent, prefix=".meta-", suffix=".json"
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump({"sha256": digest, "meta": meta}, handle, default=str)
+        os.replace(tmp_name, cache_path)
+    except (OSError, TypeError):
+        pass
+    return meta
+
+
+def _select_usecols(
+    meta: dict[str, Any],
+    *,
+    round_number: int | None,
+    variables: list[str] | None,
+    harmonize_requested: bool,
+) -> list[str] | None:
+    names = set(meta.get("column_names") or [])
+    if not harmonize_requested and variables is None:
+        return None
+    needed = {name for name in ("country", "COUNTRY", "COUNTRY_ALPHA") if name in names}
+    if harmonize_requested and round_number is not None:
+        for rounds in canonical_map().values():
+            spec = rounds.get(round_number)
+            if spec is not None and spec.var in names:
+                needed.add(spec.var)
+        if "withinwt_hh" in names:
+            needed.add("withinwt_hh")
+        families = family_map()
+        selected = (
+            list(families)
+            if variables is None
+            else [name for name in variables if name in families]
+        )
+        for family in selected:
+            spec = families[family].get(round_number)
+            if spec is not None and spec.var in names:
+                needed.add(spec.var)
+    elif variables is not None:
+        for variable in variables:
+            if variable in names:
+                needed.add(variable)
+    return sorted(needed) or None
+
+
 def _load_one(
     path: Path,
     *,
@@ -202,7 +308,14 @@ def _load_one(
     harmonize_requested: bool,
     strict: bool,
 ) -> tuple[pd.DataFrame, dict[str, Any], dict[str, str], list[str]]:
-    frame, meta = io.read_frame(path)
+    meta = _metadata_for(path, round_number)
+    usecols = _select_usecols(
+        meta,
+        round_number=round_number,
+        variables=variables,
+        harmonize_requested=harmonize_requested,
+    )
+    frame, _ = io.read_frame(path, usecols=usecols)
 
     if countries:
         keys = _country_values(frame, meta)
@@ -210,8 +323,11 @@ def _load_one(
             raise HarmonizationError(
                 "No country column is available to filter; load with harmonize=True"
             )
-        wanted = {name.casefold() for name in countries}
-        frame = frame[keys.astype(str).str.casefold().isin(wanted)]
+        wanted = {normalize_country(name) for name in countries}
+        normalized = keys.map(
+            lambda value: normalize_country(value) if pd.notna(value) else ""
+        )
+        frame = frame[normalized.isin(wanted)]
         if frame.empty:
             raise NotFoundError(
                 f"No data for {', '.join(countries)} in round {round_number}"
@@ -341,13 +457,13 @@ def select_entries(
         )
         if country_list:
             by_country = {
-                entry.country.casefold(): entry
+                normalize_country(entry.country): entry
                 for entry in candidates
                 if entry.kind == "country" and entry.country
             }
-            if all(name.casefold() in by_country for name in country_list):
+            if all(normalize_country(name) in by_country for name in country_list):
                 selected.extend(
-                    by_country[name.casefold()] for name in country_list
+                    by_country[normalize_country(name)] for name in country_list
                 )
             elif merged is not None:
                 selected.append(merged)
@@ -370,7 +486,7 @@ def rounds(refresh: bool = False) -> pd.DataFrame:
         {
             "round": entry.round,
             "year": entry.year,
-            "countries": None,
+            "countries": entry.countries_count,
             "data_url": entry.data_url,
             "codebook_url": entry.codebook_url,
             "language": entry.language,
@@ -469,9 +585,7 @@ def load(
             for entry in entries
             if entry.round in set(round_list) and entry.language == language
         ]
-        for entry in select_entries(
-            candidates, rounds=round_list, countries=country_list
-        ):
+        for entry in select_entries(candidates, rounds=round_list):
             plans.append((_download_entry(entry), entry.round, entry))
     else:
         for index, item in enumerate(source_list):
@@ -681,10 +795,22 @@ def citation(rounds: Any = None, countries: Any = None) -> str:
         if round_list
         else "All Rounds"
     )
-    return (
-        f"Afrobarometer Data, {countries_text}, {label} {rounds_text}, "
-        "available at http://www.afrobarometer.org."
-    )
+    years: list[int] = []
+    if round_list:
+        try:
+            entries = resolve_catalog()
+        except AfrobarometerError:
+            entries = []
+        by_round = {
+            entry.round: entry.year
+            for entry in entries
+            if entry.kind == "merged" and entry.year is not None
+        }
+        years = [by_round[number] for number in round_list if number in by_round]
+    parts = [f"Afrobarometer Data, {countries_text}", f"{label} {rounds_text}"]
+    if years:
+        parts.append(", ".join(str(year) for year in dict.fromkeys(years)))
+    return ", ".join(parts) + ", available at http://www.afrobarometer.org."
 
 
 def cache_dir() -> Path:

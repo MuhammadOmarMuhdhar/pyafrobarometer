@@ -190,9 +190,13 @@ def clear_cache(round_number: int | None = None) -> None:
         kept: dict[str, Any] = {}
         for url, record in files.items():
             if isinstance(record, dict) and record.get("round") == round_number:
-                path = record.get("path")
-                if isinstance(path, str):
-                    Path(path).unlink(missing_ok=True)
+                for key in ("path", "archive"):
+                    value = record.get(key)
+                    if isinstance(value, str):
+                        Path(value).unlink(missing_ok=True)
+                extract_dir = record.get("extract_dir")
+                if isinstance(extract_dir, str):
+                    shutil.rmtree(extract_dir, ignore_errors=True)
             else:
                 kept[url] = record
         state["files"] = kept

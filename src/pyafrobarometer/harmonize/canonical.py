@@ -77,9 +77,19 @@ def apply_families(
             raise HarmonizationError(f"Unknown question family: {family}")
         available = sorted(rounds)
         spec = rounds.get(round_number)
-        if spec is None or spec.var not in df.columns:
+        if spec is None:
             message = (
                 f"{family} is available in rounds {available} but not round {round_number}"
+            )
+            if strict:
+                raise HarmonizationError(message)
+            warnings.warn(message, UserWarning, stacklevel=2)
+            frame[family] = pd.NA
+            continue
+        if spec.var not in df.columns:
+            message = (
+                f"{family} maps to {spec.var!r} in round {round_number}, but that "
+                "variable is absent from this file"
             )
             if strict:
                 raise HarmonizationError(message)

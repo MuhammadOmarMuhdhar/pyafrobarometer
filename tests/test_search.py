@@ -57,3 +57,9 @@ def test_shipped_index_is_populated():
 def test_search_finds_known_variable():
     out = search.search_variables("trust president", rounds=[9], fuzzy=False)
     assert "Q37A" in set(out["name"])
+
+
+def test_search_matches_family_and_rejects_nonpositive_limit():
+    out = search.search_variables("trust_president", limit=5, index=INDEX, fuzzy=False)
+    assert "Q37A" in set(out["name"])
+    assert search.search_variables("trust", limit=0, index=INDEX, fuzzy=False).empty

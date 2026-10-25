@@ -53,8 +53,8 @@ def _round_filter(rounds: int | Iterable[int] | None) -> set[int] | None:
     return {int(round_number) for round_number in rounds}
 
 
-def _score(query: str, name: str, label: str, fuzzy: bool) -> float:
-    haystack = f"{name} {label}".casefold()
+def _score(query: str, name: str, label: str, family: str, fuzzy: bool) -> float:
+    haystack = f"{name} {label} {family}".casefold()
     needle = query.casefold()
     if fuzzy:
         try:
@@ -83,8 +83,16 @@ def search_variables(
     if frame.empty:
         return cast(pd.DataFrame, pd.DataFrame(columns=RESULT_COLUMNS))
 
+    if limit <= 0:
+        return cast(pd.DataFrame, pd.DataFrame(columns=RESULT_COLUMNS))
     scores = [
-        _score(query, str(row["name"]), str(row["label"]), fuzzy)
+        _score(
+            query,
+            str(row["name"]),
+            str(row["label"]),
+            "" if pd.isna(row.get("family")) else str(row.get("family")),
+            fuzzy,
+        )
         for _, row in frame.iterrows()
     ]
     result = frame.assign(score=scores)

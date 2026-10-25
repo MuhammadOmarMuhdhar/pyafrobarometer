@@ -104,3 +104,27 @@ def test_mutate_state_keeps_all_updates(tmp_path, monkeypatch):
     for thread in threads:
         thread.join()
     assert set(cache.read_state()["files"]) == {f"u{i}" for i in range(10)}
+
+
+def test_clear_cache_removes_archive_and_extract_dir(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path))
+    sav = cache.cache_file("files/data.sav")
+    sav.write_bytes(b"x")
+    archive = cache.cache_file("files/data.sav.zip")
+    archive.write_bytes(b"x")
+    extract_dir = cache.cache_file("files/extracted-abc/placeholder").parent
+    (extract_dir / "data.sav").write_bytes(b"x")
+    cache.write_state(
+        {
+            "files": {
+                "u": {
+                    "path": str(sav),
+                    "round": 9,
+                    "archive": str(archive),
+                    "extract_dir": str(extract_dir),
+                }
+            }
+        }
+    )
+    cache.clear_cache(9)
+    assert not sav.exists() and not archive.exists() and not extract_dir.exists()

@@ -169,6 +169,8 @@ def download(
                         size += len(chunk)
             finally:
                 response.close()
+            if size == 0:
+                raise DownloadError(f"Empty response body for {url}")
             os.replace(part, dest)
         except DownloadError:
             part.unlink(missing_ok=True)

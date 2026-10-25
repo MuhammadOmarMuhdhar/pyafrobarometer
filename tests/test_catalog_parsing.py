@@ -17,6 +17,7 @@ def test_parse_merged_entries():
     entries = catalog.parse_merged_index(read("merged_data.html"), BASE)
     r10 = next(e for e in entries if e.round == 10 and e.language == "en")
     assert r10.kind == "merged" and r10.country is None and r10.year == 2025
+    assert r10.countries_count == 38
     assert r10.data_url.endswith(".sav.zip") and r10.filename.endswith(".sav.zip")
     assert any(e.round == 10 and e.language == "fr" for e in entries)
     r9 = next(e for e in entries if e.round == 9)

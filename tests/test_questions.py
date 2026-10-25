@@ -59,3 +59,9 @@ def test_missing_family_non_strict_adds_nan():
         )
     assert out["social_media_news"].isna().all()
     assert "social_media_news" not in mapping
+
+
+def test_mapped_variable_absent_has_specific_message():
+    df = pd.DataFrame({"Q40": [0]})
+    with pytest.raises(HarmonizationError, match="absent"):
+        canonical.apply_families(df, round_number=9, families=["trust_president"])
