@@ -231,3 +231,37 @@ def test_country_load_with_only_csv_raises(monkeypatch):
     monkeypatch.setattr("pyafrobarometer.fetch.fetch_text", lambda *a, **k: html)
     with pytest.raises(ab.NotFoundError, match="CSV"):
         api._download_entry(entry)
+
+
+def test_zip_extraction_uses_a_lock(monkeypatch, tmp_path):
+    from pyafrobarometer.fetch import DownloadResult
+
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path / "cache"))
+    entry = _entry(
+        data_url="https://www.afrobarometer.org/wp-content/uploads/r10.sav.zip",
+        filename="r10.sav.zip",
+    )
+    locks = []
+    original = api.cache.url_lock
+
+    def spy(url, **kwargs):
+        locks.append(url)
+        return original(url, **kwargs)
+
+    def fake_download(url, dest, **kwargs):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"PK")
+        return DownloadResult(dest, "abc", 2, "application/zip")
+
+    def fake_extract(archive, dest_dir):
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        path = dest_dir / "data.sav"
+        path.write_bytes(b"x")
+        return path
+
+    monkeypatch.setattr(api.cache, "url_lock", spy)
+    monkeypatch.setattr(api.fetch, "download", fake_download)
+    monkeypatch.setattr(api.io, "safe_extract_sav", fake_extract)
+    path = api._download_entry(entry)
+    assert path.name == "data.sav"
+    assert any(url.endswith("#extract") for url in locks)

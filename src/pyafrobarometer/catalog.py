@@ -403,9 +403,7 @@ def resolve_catalog(*, refresh: bool = False) -> list[CatalogEntry]:
             )
             return load_baked_manifest()
         _write_cached_index(entries, time.time())
-        state = cache.read_state()
-        state["index_source"] = "live"
-        cache.write_state(state)
+        cache.mutate_state(lambda state: state.__setitem__("index_source", "live"))
         return entries
 
     if cached is not None:

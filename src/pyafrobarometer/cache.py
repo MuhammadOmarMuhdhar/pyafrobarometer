@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -121,8 +121,7 @@ def _lock_is_stale(path: Path) -> bool:
 
 
 @contextmanager
-def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
-    path = _lock_path(url)
+def _file_lock(path: Path, *, timeout: float, label: str) -> Iterator[None]:
     deadline = time.monotonic() + timeout
     while True:
         try:
@@ -133,11 +132,11 @@ def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
                 continue
             if time.monotonic() >= deadline:
                 raise CacheError(
-                    f"Timed out after {timeout}s waiting for the download lock for {url}"
+                    f"Timed out after {timeout}s waiting for {label}"
                 ) from None
             time.sleep(0.05)
         except OSError as exc:
-            raise CacheError(f"Could not create download lock for {url}: {exc}") from exc
+            raise CacheError(f"Could not create {label}: {exc}") from exc
         else:
             break
     try:
@@ -148,27 +147,55 @@ def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
         path.unlink(missing_ok=True)
 
 
+@contextmanager
+def url_lock(url: str, *, timeout: float = 300.0) -> Iterator[None]:
+    with _file_lock(
+        _lock_path(url), timeout=timeout, label=f"the download lock for {url}"
+    ):
+        yield
+
+
+def _state_lock_path() -> Path:
+    return cache_file("locks/state.lock")
+
+
+@contextmanager
+def state_lock(*, timeout: float = 300.0) -> Iterator[None]:
+    with _file_lock(
+        _state_lock_path(), timeout=timeout, label="the cache state lock"
+    ):
+        yield
+
+
+def mutate_state(mutator: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+    with state_lock():
+        state = read_state()
+        mutator(state)
+        write_state(state)
+        return state
+
+
 def clear_cache(round_number: int | None = None) -> None:
     root = cache_root()
-    state = read_state()
-    files = state.get("files")
-    if not isinstance(files, dict):
-        files = {}
-
     if round_number is None:
         for name in _LAYOUT_DIRS:
             shutil.rmtree(root / name, ignore_errors=True)
         _state_path().unlink(missing_ok=True)
         return
 
-    kept: dict[str, Any] = {}
-    for url, record in files.items():
-        if isinstance(record, dict) and record.get("round") == round_number:
-            path = record.get("path")
-            if isinstance(path, str):
-                Path(path).unlink(missing_ok=True)
-        else:
-            kept[url] = record
+    def prune(state: dict[str, Any]) -> None:
+        files = state.get("files")
+        if not isinstance(files, dict):
+            files = {}
+        kept: dict[str, Any] = {}
+        for url, record in files.items():
+            if isinstance(record, dict) and record.get("round") == round_number:
+                path = record.get("path")
+                if isinstance(path, str):
+                    Path(path).unlink(missing_ok=True)
+            else:
+                kept[url] = record
+        state["files"] = kept
+
+    mutate_state(prune)
     (root / "metadata" / f"round-{round_number}.json").unlink(missing_ok=True)
-    state["files"] = kept
-    write_state(state)

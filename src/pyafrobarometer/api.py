@@ -86,18 +86,31 @@ def _cached_file(url: str) -> Path | None:
 
 
 def _remember_file(url: str, path: Path, *, sha256: str, round_number: int | None) -> None:
-    state = cache.read_state()
-    files = state.get("files")
-    if not isinstance(files, dict):
-        files = {}
-    files[url] = {
+    record = {
         "path": str(path),
         "sha256": sha256,
         "size": path.stat().st_size,
         "round": round_number,
     }
-    state["files"] = files
-    cache.write_state(state)
+
+    def update(state: dict[str, Any]) -> None:
+        files = state.get("files")
+        if not isinstance(files, dict):
+            files = {}
+        files[url] = record
+        state["files"] = files
+
+    cache.mutate_state(update)
+
+
+def _extract_archive(url: str, dest: Path, digest: str) -> Path:
+    extract_dir = dest.parent / f"extracted-{digest}"
+    with cache.url_lock(url + "#extract"):
+        if extract_dir.exists():
+            existing = sorted(extract_dir.rglob("*.sav"))
+            if existing:
+                return existing[0]
+        return io.safe_extract_sav(dest, extract_dir)
 
 
 def _download_url(url: str) -> Path:
@@ -110,7 +123,7 @@ def _download_url(url: str) -> Path:
     result = fetch.download(url, dest)
     path = dest
     if filename.lower().endswith(".zip"):
-        path = io.safe_extract_sav(dest, dest.parent / f"extracted-{digest}")
+        path = _extract_archive(url, dest, digest)
     _remember_file(url, path, sha256=result.sha256, round_number=None)
     return path
 
@@ -152,7 +165,7 @@ def _download_entry(entry: CatalogEntry) -> Path:
     result = fetch.download(entry.data_url, dest)
     path = dest
     if filename.lower().endswith(".zip"):
-        path = io.safe_extract_sav(dest, dest.parent / f"extracted-{digest}")
+        path = _extract_archive(entry.data_url, dest, digest)
     _remember_file(
         entry.data_url, path, sha256=result.sha256, round_number=entry.round
     )
