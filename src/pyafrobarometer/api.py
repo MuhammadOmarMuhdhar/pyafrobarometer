@@ -481,6 +481,7 @@ def load(
     years: list[int] = []
     country_values: list[str] = []
     source_map: dict[str, str] = {}
+    codebook_url: str | None = None
     round_meta: dict[int, dict[str, Any]] = {}
     round_source_map: dict[int, dict[str, str]] = {}
 
@@ -505,6 +506,8 @@ def load(
         source_urls.append(
             catalog_entry.data_url if catalog_entry is not None else str(path)
         )
+        if catalog_entry is not None and codebook_url is None:
+            codebook_url = catalog_entry.codebook_url
         if round_number is not None:
             rounds_used.append(round_number)
         country_values.extend(all_countries)
@@ -521,6 +524,7 @@ def load(
         countries=tuple(dict.fromkeys(country_values)),
         language=language,
         years=tuple(years),
+        codebook_url=codebook_url,
     )
     dataset = Dataset(
         combined,

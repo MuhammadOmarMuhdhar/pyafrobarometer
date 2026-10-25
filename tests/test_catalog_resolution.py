@@ -125,3 +125,47 @@ def test_fresh_invalid_cache_falls_back(tmp_path, monkeypatch):
 
 def test_baked_manifest_covers_all_rounds():
     assert set(range(1, 11)) <= {e.round for e in catalog.load_baked_manifest()}
+
+
+def test_fetch_catalog_attaches_codebooks(monkeypatch):
+    merged = (
+        '<a href="/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip">'
+        "Merged Round 10 data (38 countries) (2025)</a>"
+        '<a href="/wp-content/uploads/2026/10/Merge_Round_10_Codebook_09.09.26.pdf">'
+        "Merged Round 10 codebook (38 countries) (2025)</a>"
+    )
+
+    def fake_fetch(url, *args, **kwargs):
+        if "merged-data" in url:
+            return merged
+        return "<html></html>"
+
+    monkeypatch.setattr(catalog, "fetch_text", fake_fetch)
+    entries = catalog._fetch_catalog()
+    entry = next(item for item in entries if item.round == 10)
+    assert entry.codebook_url.endswith("Merge_Round_10_Codebook_09.09.26.pdf")
+
+
+def test_follow_resource_page_preserves_known_codebook(monkeypatch):
+    from pyafrobarometer.catalog import CatalogEntry
+
+    entry = CatalogEntry(
+        kind="merged",
+        round=5,
+        country=None,
+        year=2011,
+        language="en",
+        data_url="https://www.afrobarometer.org/survey-resource/merged-round-5-data/",
+        codebook_url="https://www.afrobarometer.org/survey-resource/merged-round-5-codebook/",
+        page_url="https://www.afrobarometer.org/survey-resource/merged-round-5-data/",
+        filename="merged-round-5-data",
+        size_bytes=None,
+    )
+    notes = (
+        '<a href="https://www.afrobarometer.org/wp-content/uploads/2022/02/r5_data.sav">Data</a>'
+        '<a href="https://www.afrobarometer.org/wp-content/uploads/2022/02/R5_notes.pdf">Notes</a>'
+    )
+    monkeypatch.setattr(catalog, "fetch_text", lambda *a, **k: notes)
+    followed = catalog._follow_resource_page(entry)
+    assert followed.codebook_url == entry.codebook_url
+    assert followed.data_url.endswith("r5_data.sav")

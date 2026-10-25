@@ -178,6 +178,33 @@ def parse_country_index(html: str, base_url: str) -> list[CatalogEntry]:
     return entries
 
 
+def parse_merged_codebooks(html: str, base_url: str) -> dict[int, str]:
+    codebooks: dict[int, str] = {}
+    for text, href in _anchors(html):
+        if "codebook" not in text.casefold() and "codebook" not in href.casefold():
+            continue
+        match = re.search(r"Round\s+(\d+)", text, re.IGNORECASE)
+        if match is None:
+            match = re.search(r"round-(\d+)", href, re.IGNORECASE)
+        if match is None:
+            continue
+        codebooks[int(match.group(1))] = _resolve_url(base_url, href)
+    return codebooks
+
+
+def extract_codebook_link(html: str, base_url: str) -> str | None:
+    first_pdf: str | None = None
+    for text, href in _anchors(html):
+        url = _resolve_url(base_url, href)
+        if not urlparse(url).path.lower().endswith(".pdf"):
+            continue
+        if first_pdf is None:
+            first_pdf = url
+        if "codebook" in text.casefold() or "codebook" in href.casefold():
+            return url
+    return first_pdf
+
+
 def has_csv_link(html: str, base_url: str) -> bool:
     for _, href in _anchors(html):
         if urlparse(_resolve_url(base_url, href)).path.lower().endswith(".csv"):
@@ -304,7 +331,7 @@ def _follow_resource_page(entry: CatalogEntry) -> CatalogEntry:
     return replace(
         entry,
         data_url=data_url,
-        codebook_url=codebook_url or entry.codebook_url,
+        codebook_url=entry.codebook_url or codebook_url,
         filename=_filename(data_url),
     )
 
@@ -336,7 +363,11 @@ def _fetch_country_index() -> list[CatalogEntry]:
 
 def _fetch_catalog() -> list[CatalogEntry]:
     merged_html = fetch_text(MERGED_INDEX_URL)
-    entries = parse_merged_index(merged_html, MERGED_INDEX_URL)
+    codebooks = parse_merged_codebooks(merged_html, MERGED_INDEX_URL)
+    entries = [
+        replace(entry, codebook_url=codebooks.get(entry.round, entry.codebook_url))
+        for entry in parse_merged_index(merged_html, MERGED_INDEX_URL)
+    ]
     entries.extend(_fetch_country_index())
     entries = [
         _follow_resource_page(entry) if entry.kind == "merged" else entry

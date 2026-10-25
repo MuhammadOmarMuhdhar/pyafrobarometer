@@ -102,3 +102,18 @@ def test_country_index_raises_when_cards_do_not_parse(monkeypatch):
     monkeypatch.setattr(catalog, "fetch_text", lambda *a, **k: html)
     with pytest.raises(CatalogError):
         catalog._fetch_country_index()
+
+
+def test_parse_merged_codebooks():
+    html = (
+        '<a href="/wp-content/uploads/2026/10/Merge_Round_10_Codebook_09.09.26.pdf">'
+        "Merged Round 10 codebook (38 countries) (2025)</a>"
+        '<a href="/survey-resource/merged-round-7-codebook-34-countries-2020/">'
+        "Merged Round 7 codebook (34 countries) (2020)</a>"
+        '<a href="/wp-content/uploads/2022/02/R5_notes.pdf">'
+        "New country data sets notes</a>"
+    )
+    mapping = catalog.parse_merged_codebooks(html, BASE)
+    assert mapping[10].endswith(".pdf")
+    assert mapping[7].endswith("/merged-round-7-codebook-34-countries-2020/")
+    assert all("notes" not in url for url in mapping.values())

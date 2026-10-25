@@ -20,6 +20,7 @@ class Provenance:
     countries: tuple[str, ...]
     language: str
     years: tuple[int, ...] = field(default_factory=tuple)
+    codebook_url: str | None = None
     codebook_path: Path | None = None
 
 
@@ -144,9 +145,13 @@ class Dataset:
         return ", ".join(parts) + ", available at http://www.afrobarometer.org."
 
     def codebook(self) -> Path:
-        if self.provenance.codebook_path is None:
-            raise CodebookError("No codebook is available for this dataset")
-        return Path(self.provenance.codebook_path)
+        if self.provenance.codebook_path is not None:
+            return Path(self.provenance.codebook_path)
+        if self.provenance.codebook_url:
+            from pyafrobarometer.codebook import download_codebook
+
+            return download_codebook(self.provenance.codebook_url)
+        raise CodebookError("No codebook is available for this dataset")
 
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_"):

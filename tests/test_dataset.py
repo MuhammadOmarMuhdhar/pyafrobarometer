@@ -101,3 +101,32 @@ def test_round_specific_labels():
         round_source_map={8: {"gender": "gender"}, 9: {"gender": "gender"}},
     )
     assert ds.to_pandas(labels=True)["gender"].tolist() == ["Male", "Woman"]
+
+
+def test_dataset_codebook_uses_provenance(monkeypatch, tmp_path):
+    import importlib
+
+    codebook_module = importlib.import_module("pyafrobarometer.codebook")
+    target = tmp_path / "cb.pdf"
+    called = []
+    monkeypatch.setattr(
+        codebook_module,
+        "download_codebook",
+        lambda url: called.append(url) or target,
+    )
+    prov = Provenance(
+        ("https://www.afrobarometer.org/x.sav",),
+        "2026-10-25T00:00:00Z",
+        (9,),
+        ("Benin",),
+        "en",
+        codebook_url="https://www.afrobarometer.org/cb.pdf",
+    )
+    ds = Dataset(
+        pd.DataFrame({"A": [1]}),
+        variables=pd.DataFrame(columns=["name", "label", "value_labels", "missing_codes"]),
+        provenance=prov,
+        meta={},
+    )
+    assert ds.codebook() == target
+    assert called == ["https://www.afrobarometer.org/cb.pdf"]

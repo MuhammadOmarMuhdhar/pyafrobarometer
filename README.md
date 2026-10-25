@@ -107,6 +107,8 @@ weekly catalog job. Search never downloads a dataset.
 ```python
 path = ab.codebook(round=10)                 # downloaded PDF
 text = ab.codebook(round=10, extract_text=True)  # .txt next to the PDF
+ds = ab.load(rounds=10)
+print(ds.codebook())                         # codebook for a loaded dataset
 ```
 
 Text extraction needs the `[codebook]` extra.

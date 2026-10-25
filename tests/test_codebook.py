@@ -61,3 +61,40 @@ def test_missing_codebook_url_does_not_fetch_dataset(monkeypatch):
     monkeypatch.setattr(codebook.fetch, "fetch_text", fail)
     with pytest.raises(CodebookError, match="codebook"):
         codebook.get_codebook(entry)
+
+
+def test_get_codebook_follows_resource_page(monkeypatch, tmp_path):
+    from pyafrobarometer.catalog import CatalogEntry
+    from pyafrobarometer.fetch import DownloadResult
+
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path))
+    entry = CatalogEntry(
+        kind="merged",
+        round=7,
+        country=None,
+        year=2019,
+        language="en",
+        data_url="https://www.afrobarometer.org/x.sav",
+        codebook_url="https://www.afrobarometer.org/survey-resource/merged-round-7-codebook-34-countries-2020/",
+        page_url="https://www.afrobarometer.org/data/merged-data/",
+        filename="x.sav",
+        size_bytes=None,
+    )
+    page = (
+        '<a href="https://www.afrobarometer.org/wp-content/uploads/2023/02/'
+        'r7_merged.codebook_final_14dec20-1-1.pdf">Merged Round 7 codebook</a>'
+    )
+
+    downloaded = []
+
+    def fake_download(url, dest, **kwargs):
+        downloaded.append(url)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"%PDF")
+        return DownloadResult(dest, "x", 4, "application/pdf")
+
+    monkeypatch.setattr(codebook.fetch, "fetch_text", lambda *a, **k: page)
+    monkeypatch.setattr(codebook.fetch, "download", fake_download)
+    path = codebook.get_codebook(entry)
+    assert path.read_bytes() == b"%PDF"
+    assert downloaded and downloaded[0].endswith(".pdf")

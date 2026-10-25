@@ -21,14 +21,19 @@ def _resolve_url(entry: CatalogEntry) -> str:
         return entry.codebook_url
     if entry.page_url and not _is_data_url(entry.page_url):
         html = fetch.fetch_text(entry.page_url)
-        _, codebook_url = catalog.extract_resource_links(html, entry.page_url)
+        codebook_url = catalog.extract_codebook_link(html, entry.page_url)
         if codebook_url:
             return codebook_url
     raise CodebookError(f"No codebook URL is available for round {entry.round}")
 
 
-def get_codebook(entry: CatalogEntry) -> Path:
-    url = _resolve_url(entry)
+def download_codebook(url: str) -> Path:
+    if not urlparse(url).path.lower().endswith(".pdf"):
+        html = fetch.fetch_text(url)
+        pdf = catalog.extract_codebook_link(html, url)
+        if pdf is None:
+            raise CodebookError(f"No PDF codebook found at {url}")
+        url = pdf
     filename = PurePosixPath(urlparse(url).path).name or "codebook.pdf"
     digest = hashlib.sha256(url.encode("utf-8")).hexdigest()
     dest = cache.cache_file(f"files/{digest}-{filename}")
@@ -39,6 +44,10 @@ def get_codebook(entry: CatalogEntry) -> Path:
     except DownloadError as exc:
         raise CodebookError(f"Could not download codebook {url}: {exc}") from exc
     return dest
+
+
+def get_codebook(entry: CatalogEntry) -> Path:
+    return download_codebook(_resolve_url(entry))
 
 
 def extract_text(path: Path) -> str:
