@@ -115,3 +115,15 @@ def family_rounds(family: str) -> list[int]:
     if rounds is None:
         raise HarmonizationError(f"Unknown question family: {family}")
     return sorted(rounds)
+
+
+def family_descriptions() -> dict[str, str]:
+    config = _load("crosswalk/questions.yaml")
+    section = config.get("families")
+    if not isinstance(section, dict):
+        raise HarmonizationError("questions.yaml has no families section")
+    descriptions: dict[str, str] = {}
+    for family, spec in section.items():
+        description = spec.get("description") if isinstance(spec, dict) else None
+        descriptions[str(family)] = str(description or "")
+    return descriptions

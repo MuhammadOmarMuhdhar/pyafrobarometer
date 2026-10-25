@@ -1,8 +1,9 @@
+import importlib
 from pathlib import Path
 
 import pytest
 
-from pyafrobarometer import codebook
+codebook = importlib.import_module("pyafrobarometer.codebook")
 from pyafrobarometer.errors import CodebookError
 
 
