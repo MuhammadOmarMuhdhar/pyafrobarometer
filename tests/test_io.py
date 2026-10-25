@@ -56,3 +56,10 @@ def test_extract_ignores_macos_metadata(tmp_path):
         z.writestr("__MACOSX/._data.sav", b"x")
     out = io.safe_extract_sav(archive, tmp_path / "out")
     assert out.name == "data.sav"
+
+
+def test_read_dta_dispatch(tmp_path):
+    p = tmp_path / "x.dta"
+    pyreadstat.write_dta(pd.DataFrame({"A": [1, 2]}), str(p))
+    df, _ = io.read_frame(p)
+    assert df["A"].tolist() == [1, 2]

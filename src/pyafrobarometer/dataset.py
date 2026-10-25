@@ -33,6 +33,8 @@ class Dataset:
         meta: dict[str, Any],
         source_map: dict[str, str] | None = None,
         harmonized: bool = False,
+        round_meta: dict[int, dict[str, Any]] | None = None,
+        round_source_map: dict[int, dict[str, str]] | None = None,
     ) -> None:
         self._df = df
         self._variables = variables.copy()
@@ -40,6 +42,8 @@ class Dataset:
         self._meta = dict(meta)
         self._source_map = dict(source_map or {})
         self.harmonized = harmonized
+        self._round_meta = dict(round_meta or {})
+        self._round_source_map = dict(round_source_map or {})
 
     @property
     def rounds(self) -> list[int]:
@@ -61,6 +65,29 @@ class Dataset:
         normalize_missing: bool = False,
     ) -> pd.DataFrame:
         frame = self._df.copy()
+        if self._round_meta and "round" in frame.columns:
+            for column in frame.columns:
+                result = frame[column].astype(object)
+                for round_number, meta in self._round_meta.items():
+                    mask = frame["round"] == round_number
+                    if not bool(mask.any()):
+                        continue
+                    sources = self._round_source_map.get(
+                        round_number, self._source_map
+                    )
+                    source = sources.get(str(column), str(column))
+                    series = frame.loc[mask, column]
+                    if normalize_missing:
+                        codes = metadata.missing_codes(meta, source)
+                        if codes:
+                            series = series.where(~series.isin(codes), pd.NA)
+                    if labels:
+                        mapping = metadata.value_labels(meta, source)
+                        if mapping:
+                            series = metadata.decode_column(series, mapping)
+                    result.loc[mask] = series.tolist()
+                frame[column] = result
+            return cast(pd.DataFrame, frame)
         for column in frame.columns:
             source = self._source(str(column))
             if normalize_missing:
@@ -103,6 +130,8 @@ class Dataset:
             meta=self._meta,
             source_map=self._source_map,
             harmonized=self.harmonized,
+            round_meta=self._round_meta,
+            round_source_map=self._round_source_map,
         )
 
     def citation(self) -> str:

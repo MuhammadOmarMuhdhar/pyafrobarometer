@@ -1,42 +1,138 @@
 {
-  "version": 1,
-  "generated_at": "2026-10-25",
   "entries": [
     {
-      "kind": "merged",
-      "round": 8,
+      "codebook_url": null,
       "country": null,
-      "year": 2022,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged_r1_data.sav",
+      "filename": "merged_r1_data.sav",
+      "kind": "merged",
       "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-1-data-12-countries-1999-2001/",
+      "round": 1,
+      "size_bytes": null,
+      "year": 1999
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged_r2_data.sav",
+      "filename": "merged_r2_data.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-2-data-16-countries-2004/",
+      "round": 2,
+      "size_bytes": null,
+      "year": 2004
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged_r3_data.sav",
+      "filename": "merged_r3_data.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-3-data-18-countries-2005/",
+      "round": 3,
+      "size_bytes": null,
+      "year": 2005
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged_r4_data.sav",
+      "filename": "merged_r4_data.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-4-data-20-countries-2008/",
+      "round": 4,
+      "size_bytes": null,
+      "year": 2008
+    },
+    {
+      "codebook_url": "https://www.afrobarometer.org/sites/default/files/data/round-5/R5_new_country_datasets_notes_July2015.pdf",
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged-round-5-data-34-countries-2011-2013-last-update-july-2015_0.sav",
+      "filename": "merged-round-5-data-34-countries-2011-2013-last-update-july-2015_0.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-5-data-34-countries-2015/",
+      "round": 5,
+      "size_bytes": null,
+      "year": 2011
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/merged_r6_data_2016_36countries2.sav",
+      "filename": "merged_r6_data_2016_36countries2.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-6-data-36-countries-2016/",
+      "round": 6,
+      "size_bytes": null,
+      "year": 2016
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2022/02/r7_merged_data_34ctry.release.sav",
+      "filename": "r7_merged_data_34ctry.release.sav",
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-7-data-34-countries-2019/",
+      "round": 7,
+      "size_bytes": null,
+      "year": 2019
+    },
+    {
+      "codebook_url": null,
+      "country": null,
       "data_url": "https://www.afrobarometer.org/wp-content/uploads/2023/03/afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav",
-      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2025/07/R8_Merge-Codebook_28May24.final_.pdf",
-      "page_url": "https://www.afrobarometer.org/data/merged-data/",
       "filename": "afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav",
-      "size_bytes": null
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/survey-resource/merged-round-8-data-34-countries-2022/",
+      "round": 8,
+      "size_bytes": null,
+      "year": 2022
     },
     {
-      "kind": "merged",
-      "round": 9,
+      "codebook_url": null,
       "country": null,
-      "year": 2023,
-      "language": "en",
       "data_url": "https://www.afrobarometer.org/wp-content/uploads/2025/06/R9.Merge_39ctry.20Nov23.final_.release_Updated.4Jun25-3.sav",
-      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2025/07/AB_R9.MergeCodebook_25Jun24.final_.pdf",
-      "page_url": "https://www.afrobarometer.org/data/merged-data/",
       "filename": "R9.Merge_39ctry.20Nov23.final_.release_Updated.4Jun25-3.sav",
-      "size_bytes": null
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/wp-content/uploads/2025/06/R9.Merge_39ctry.20Nov23.final_.release_Updated.4Jun25-3.sav",
+      "round": 9,
+      "size_bytes": null,
+      "year": 2023
     },
     {
-      "kind": "merged",
-      "round": 10,
+      "codebook_url": null,
       "country": null,
-      "year": 2025,
-      "language": "en",
       "data_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip",
-      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/Merge_Round_10_Codebook_09.09.26.pdf",
-      "page_url": "https://www.afrobarometer.org/data/merged-data/",
       "filename": "AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip",
-      "size_bytes": null
+      "kind": "merged",
+      "language": "en",
+      "page_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip",
+      "round": 10,
+      "size_bytes": null,
+      "year": 2025
+    },
+    {
+      "codebook_url": null,
+      "country": null,
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.Fr_.sav.zip",
+      "filename": "AB_R10.Merge-Dataset_25Feb26.38ctry.release.Fr_.sav.zip",
+      "kind": "merged",
+      "language": "fr",
+      "page_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.Fr_.sav.zip",
+      "round": 10,
+      "size_bytes": null,
+      "year": 2025
     }
-  ]
+  ],
+  "generated_at": "2026-10-25",
+  "version": 1
 }

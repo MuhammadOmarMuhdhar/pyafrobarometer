@@ -57,9 +57,11 @@ returns a copy; mutating it never mutates the dataset.
 
 ## Rounds, countries, and availability
 
-- Merged rounds 1–10 are supported. Country-level files are discoverable from the
-  Afrobarometer data-sets page; if a country/round is not listed, the package
-  raises `NotFoundError` rather than guessing a URL.
+- Merged rounds 1–10 are supported, and the baked manifest covers all ten.
+  Country-level discovery reads the first data-sets listing page and supports
+  `.sav`/`.zip`/`.dta` links; paginated listings and CSV-only country pages are
+  not supported in v1, so unavailable country data raises `NotFoundError`
+  rather than guessing a URL.
 - Canonical variables (`country`, `respondent_id`, `weight`, `region`,
   `urban_rural`, `age`, `gender`, `education`, `interview_date`) are mapped per
   round from a curated YAML crosswalk. A mapping that cannot be verified is
@@ -97,8 +99,11 @@ ab.search_variables("trust president", rounds=[8, 9], limit=10)
 ```
 
 With `rapidfuzz` installed (`[search]` extra), matching is fuzzy; otherwise it is
-case-insensitive substring matching. Search uses the shipped metadata index plus
-any cached round metadata and never downloads a dataset.
+case-insensitive substring matching. Search reads the shipped
+`metadata_index.json`, which the weekly catalog job regenerates from downloaded
+metadata. The repository ships it empty for v1; run
+`python scripts/update_catalog.py --write --metadata-rounds all` to populate it.
+Search never downloads a dataset.
 
 ## Codebooks
 

@@ -114,3 +114,14 @@ def test_offline_uses_baked_manifest_without_network(tmp_path, monkeypatch):
     monkeypatch.setenv("PYAFROBAROMETER_OFFLINE", "1")
     monkeypatch.setattr(catalog, "fetch_text", network_forbidden)
     assert catalog.resolve_catalog()
+
+
+def test_fresh_invalid_cache_falls_back(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYAFROBAROMETER_CACHE_DIR", str(tmp_path))
+    write_index([], time.time())
+    monkeypatch.setattr(catalog, "fetch_text", lambda *a, **k: "<html></html>")
+    assert catalog.resolve_catalog()
+
+
+def test_baked_manifest_covers_all_rounds():
+    assert set(range(1, 11)) <= {e.round for e in catalog.load_baked_manifest()}

@@ -42,3 +42,21 @@ def test_decode_column_keeps_unknown_codes():
         pd.Series([3, 9]), META["variable_value_labels"]["COUNTRY"]
     )
     assert out.tolist() == ["Benin", "Côte d'Ivoire"]
+
+
+def test_country_codes_are_not_treated_as_missing():
+    meta = {
+        "column_names": ["COUNTRY", "Q37A"],
+        "column_labels": ["Country", "Trust"],
+        "variable_value_labels": {
+            "COUNTRY": {8.0: "Cabo Verde", 9.0: "Côte d'Ivoire"},
+            "Q37A": {8.0: "Refused", 9.0: "Don't know", -1.0: "Missing"},
+        },
+        "missing_ranges": {},
+    }
+    assert 8 not in metadata.missing_codes(meta, "COUNTRY")
+    assert 9 not in metadata.missing_codes(meta, "COUNTRY")
+    df = pd.DataFrame({"COUNTRY": [8, 9], "Q37A": [8, 9]})
+    out = metadata.normalize_missing(df, meta)
+    assert out["COUNTRY"].tolist() == [8, 9]
+    assert out["Q37A"].isna().tolist() == [True, True]

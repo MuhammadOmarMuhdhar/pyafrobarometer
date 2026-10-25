@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, cast
 
 import pandas as pd
@@ -43,8 +44,30 @@ def value_labels(meta: dict[str, Any], column: str) -> dict[int, str]:
     return _labels(meta, column)
 
 
+def _looks_missing(label: str) -> bool:
+    text = label.casefold()
+    return bool(re.search(r"\bdk\b", text)) or any(
+        word in text
+        for word in (
+            "missing",
+            "refused",
+            "don't know",
+            "dont know",
+            "do not know",
+            "no answer",
+            "unknown",
+            "not applicable",
+            "not asked",
+        )
+    )
+
+
 def _fallback_codes(labels: dict[int, str]) -> set[int]:
-    return {code for code in FALLBACK_MISSING_CODES if code in labels}
+    return {
+        code
+        for code, label in labels.items()
+        if code in FALLBACK_MISSING_CODES and _looks_missing(label)
+    }
 
 
 def missing_codes(meta: dict[str, Any], column: str) -> list[int]:

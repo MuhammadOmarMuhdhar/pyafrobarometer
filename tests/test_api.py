@@ -177,3 +177,17 @@ def test_second_load_reuses_cached_download(monkeypatch, tmp_path):
     ab.load(rounds=9, harmonize=True)
     ab.load(rounds=9, harmonize=True)
     assert calls == [e.data_url]
+
+
+def test_filtered_load_reports_filtered_countries(tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    ds = ab.load(rounds=9, countries=["Ghana"], source=p, harmonize=True)
+    assert ds.countries == ["Ghana"]
+
+
+def test_unknown_country_raises(tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    with pytest.raises(ab.NotFoundError):
+        ab.load(rounds=9, countries=["Atlantis"], source=p, harmonize=True)

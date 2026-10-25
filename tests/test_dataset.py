@@ -72,3 +72,32 @@ def test_subset_and_pickle():
 
 def test_variables_frame_available():
     assert set(make().variables()["name"]) == {"COUNTRY", "Q37A"}
+
+
+def test_round_specific_labels():
+    df = pd.DataFrame({"round": [8, 9], "gender": [1, 1]})
+    meta8 = {
+        "variable_value_labels": {"gender": {1.0: "Male", 2.0: "Female"}},
+        "missing_ranges": {},
+    }
+    meta9 = {
+        "variable_value_labels": {"gender": {1.0: "Woman", 2.0: "Man"}},
+        "missing_ranges": {},
+    }
+    prov = Provenance(
+        ("https://www.afrobarometer.org/x.sav",),
+        "2026-10-25T00:00:00Z",
+        (8, 9),
+        ("Benin",),
+        "en",
+    )
+    ds = Dataset(
+        df,
+        variables=pd.DataFrame(columns=["name", "label", "value_labels", "missing_codes"]),
+        provenance=prov,
+        meta={},
+        source_map={"gender": "gender"},
+        round_meta={8: meta8, 9: meta9},
+        round_source_map={8: {"gender": "gender"}, 9: {"gender": "gender"}},
+    )
+    assert ds.to_pandas(labels=True)["gender"].tolist() == ["Male", "Woman"]

@@ -40,8 +40,14 @@ def safe_extract_sav(archive: Path, dest_dir: Path) -> Path:
         raise CacheError(f"{archive} is not a valid zip archive: {exc}") from exc
 
 
+def _reader(path: Path) -> Any:
+    return pyreadstat.read_dta if path.suffix.lower() == ".dta" else pyreadstat.read_sav
+
+
 def read_metadata(path: Path) -> dict[str, Any]:
-    _, meta = pyreadstat.read_sav(str(path), metadataonly=True)
+    _, meta = _reader(path)(str(path), metadataonly=True)
+    if meta is None:
+        return {}
     return dict(vars(meta))
 
 
@@ -51,9 +57,11 @@ def read_frame(
     usecols: Sequence[str] | None = None,
     apply_value_labels: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    frame, meta = pyreadstat.read_sav(
+    frame, meta = _reader(path)(
         str(path),
         usecols=list(usecols) if usecols else None,
         apply_value_formats=apply_value_labels,
     )
+    if meta is None:
+        return frame, {}
     return frame, dict(vars(meta))

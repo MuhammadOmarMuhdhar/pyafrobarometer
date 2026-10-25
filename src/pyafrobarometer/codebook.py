@@ -12,15 +12,19 @@ from pyafrobarometer.catalog import CatalogEntry
 from pyafrobarometer.errors import CodebookError, DownloadError
 
 
+def _is_data_url(url: str) -> bool:
+    return urlparse(url).path.lower().endswith((".sav", ".sav.zip", ".dta"))
+
+
 def _resolve_url(entry: CatalogEntry) -> str:
     if entry.codebook_url:
         return entry.codebook_url
-    if entry.page_url:
+    if entry.page_url and not _is_data_url(entry.page_url):
         html = fetch.fetch_text(entry.page_url)
         _, codebook_url = catalog.extract_resource_links(html, entry.page_url)
         if codebook_url:
             return codebook_url
-    raise CodebookError(f"No codebook is available for round {entry.round}")
+    raise CodebookError(f"No codebook URL is available for round {entry.round}")
 
 
 def get_codebook(entry: CatalogEntry) -> Path:

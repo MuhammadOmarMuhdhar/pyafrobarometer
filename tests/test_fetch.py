@@ -84,3 +84,43 @@ def test_download_accepts_missing_content_type(tmp_path, monkeypatch):
     install(monkeypatch, "get", [response(200, b"x", {})])
     result = fetch.download(URL + "/a.sav", tmp_path / "a.sav")
     assert result.size == 1
+
+
+def test_offline_refuses_network(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYAFROBAROMETER_OFFLINE", "1")
+
+    def fail(*args, **kwargs):
+        raise AssertionError("network")
+
+    monkeypatch.setattr(requests.Session, "get", fail)
+    with pytest.raises(DownloadError, match="OFFLINE"):
+        fetch.download(URL + "/a.sav", tmp_path / "a.sav")
+
+
+def test_concurrent_downloads_run_once(tmp_path, monkeypatch):
+    import threading
+    import time
+
+    calls = []
+    guard = threading.Lock()
+
+    def fake(self, url, **kwargs):
+        with guard:
+            calls.append(url)
+        time.sleep(0.2)
+        return response(200, b"x", {"content-type": "application/x-spss-sav"})
+
+    monkeypatch.setattr(requests.Session, "get", fake)
+    barrier = threading.Barrier(2)
+    results = []
+
+    def worker():
+        barrier.wait()
+        results.append(fetch.download(URL + "/a.sav", tmp_path / "a.sav"))
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len(calls) == 1 and len(results) == 2

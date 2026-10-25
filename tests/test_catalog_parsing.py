@@ -60,3 +60,14 @@ def test_absolute_http_links_are_upgraded():
     )
     entries = catalog.parse_merged_index(html, BASE)
     assert entries[0].data_url.startswith("https://www.afrobarometer.org/")
+
+
+def test_parse_live_country_card_text():
+    html = (
+        '<a href="/survey-resource/south-africa-round-10-data-2026/">'
+        "Data set South Africa Round 10 data (2026) 25 Sep 2026 South Africa Round 10 data"
+        "</a>"
+    )
+    entries = catalog.parse_country_index(html, BASE)
+    assert entries and entries[0].country == "South Africa"
+    assert entries[0].round == 10 and entries[0].year == 2026

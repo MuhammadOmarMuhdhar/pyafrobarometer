@@ -29,7 +29,7 @@ MERGED_TITLE = re.compile(
 )
 FRENCH_TITLE = re.compile(r"S[ée]rie (?P<round>\d+)")
 COUNTRY_TITLE = re.compile(
-    r"^(?P<country>.+?) Round (?P<round>\d+) data \((?P<year>\d{4})\)$"
+    r"^(?P<country>.+?) Round (?P<round>\d+) data \((?P<year>\d{4})\)"
 )
 DATA_SUFFIXES = (".sav", ".sav.zip", ".dta")
 ALLOWED_HOST = "www.afrobarometer.org"
@@ -132,7 +132,10 @@ def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
 def parse_country_index(html: str, base_url: str) -> list[CatalogEntry]:
     entries: list[CatalogEntry] = []
     for text, href in _anchors(html):
-        match = COUNTRY_TITLE.match(text.strip())
+        title = text.strip()
+        if title.casefold().startswith("data set "):
+            title = title[9:]
+        match = COUNTRY_TITLE.match(title)
         if match is None:
             continue
         url = _resolve_url(base_url, href)
@@ -238,6 +241,7 @@ def _read_cached_index() -> tuple[float, list[CatalogEntry]] | None:
         return None
     try:
         entries = _entries_from_payload(payload)
+        validate_catalog(entries)
     except CatalogError:
         return None
     return fetched_at, entries

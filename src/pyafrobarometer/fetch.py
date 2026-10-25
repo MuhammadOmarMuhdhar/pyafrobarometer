@@ -51,6 +51,11 @@ def _require_https(url: str) -> None:
         raise DownloadError(f"Refusing URL outside {_ALLOWED_HOST}: {url}")
 
 
+def _require_online(url: str) -> None:
+    if os.environ.get("PYAFROBAROMETER_OFFLINE") == "1":
+        raise DownloadError(f"PYAFROBAROMETER_OFFLINE=1: refusing network access to {url}")
+
+
 def _backoff_seconds(attempt: int) -> float:
     value = 0.5 * (2.0**attempt)
     return min(value, 2.0)
@@ -68,6 +73,7 @@ def _retry_delay(response: requests.Response, attempt: int) -> float:
 
 def http_get(url: str, *, timeout: float = 60.0, retries: int = 3) -> requests.Response:
     _require_https(url)
+    _require_online(url)
     session = _new_session()
     last_error: Exception | None = None
     attempts = max(1, retries)
@@ -99,6 +105,7 @@ def http_get(url: str, *, timeout: float = 60.0, retries: int = 3) -> requests.R
 
 def http_head(url: str, *, timeout: float = 30.0) -> requests.Response:
     _require_https(url)
+    _require_online(url)
     session = _new_session()
     try:
         return session.head(url, timeout=timeout, allow_redirects=True)
@@ -127,12 +134,21 @@ def download(
     retries: int = 3,
 ) -> DownloadResult:
     _require_https(url)
+    _require_online(url)
     allowed = expected_types or DEFAULT_CONTENT_TYPES
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_suffix(dest.suffix + ".part")
 
     with cache.url_lock(url):
+        if dest.exists() and dest.stat().st_size > 0:
+            existing = dest.read_bytes()
+            return DownloadResult(
+                path=dest,
+                sha256=hashlib.sha256(existing).hexdigest(),
+                size=len(existing),
+                content_type="",
+            )
         try:
             response = http_get(url, timeout=timeout, retries=retries)
             try:

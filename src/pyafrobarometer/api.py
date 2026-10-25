@@ -185,7 +185,6 @@ def _load_one(
     strict: bool,
 ) -> tuple[pd.DataFrame, dict[str, Any], dict[str, str], list[str]]:
     frame, meta = io.read_frame(path)
-    all_countries = _unique_countries(frame, meta)
 
     if countries:
         keys = _country_values(frame, meta)
@@ -195,6 +194,11 @@ def _load_one(
             )
         wanted = {name.casefold() for name in countries}
         frame = frame[keys.astype(str).str.casefold().isin(wanted)]
+        if frame.empty:
+            raise NotFoundError(
+                f"No data for {', '.join(countries)} in round {round_number}"
+            )
+    all_countries = _unique_countries(frame, meta)
 
     source_map: dict[str, str] = {}
     if harmonize_requested:
@@ -472,6 +476,8 @@ def load(
     years: list[int] = []
     country_values: list[str] = []
     source_map: dict[str, str] = {}
+    round_meta: dict[int, dict[str, Any]] = {}
+    round_source_map: dict[int, dict[str, str]] = {}
 
     for path, round_number, catalog_entry in plans:
         frame, meta, applied, all_countries = _load_one(
@@ -488,6 +494,9 @@ def load(
         frames.append(frame)
         metas.append(meta)
         source_map.update(applied)
+        if round_number is not None:
+            round_meta[round_number] = meta
+            round_source_map[round_number] = applied
         source_urls.append(
             catalog_entry.data_url if catalog_entry is not None else str(path)
         )
@@ -515,6 +524,8 @@ def load(
         meta=meta,
         source_map=source_map,
         harmonized=harmonize,
+        round_meta=round_meta,
+        round_source_map=round_source_map,
     )
     if labels or normalize_missing:
         converted = dataset.to_pandas(
@@ -527,6 +538,8 @@ def load(
             meta=meta,
             source_map=source_map,
             harmonized=harmonize,
+            round_meta=round_meta,
+            round_source_map=round_source_map,
         )
     return dataset
 

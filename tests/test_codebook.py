@@ -37,3 +37,27 @@ def test_extract_text_uses_pypdf(monkeypatch):
 
     monkeypatch.setattr(pypdf, "PdfReader", Reader)
     assert codebook.extract_text(Path("x.pdf")) == "hello"
+
+
+def test_missing_codebook_url_does_not_fetch_dataset(monkeypatch):
+    from pyafrobarometer.catalog import CatalogEntry
+
+    entry = CatalogEntry(
+        kind="merged",
+        round=9,
+        country=None,
+        year=2023,
+        language="en",
+        data_url="https://www.afrobarometer.org/x.sav",
+        codebook_url=None,
+        page_url="https://www.afrobarometer.org/x.sav",
+        filename="x.sav",
+        size_bytes=None,
+    )
+
+    def fail(*args, **kwargs):
+        raise AssertionError("network")
+
+    monkeypatch.setattr(codebook.fetch, "fetch_text", fail)
+    with pytest.raises(CodebookError, match="codebook"):
+        codebook.get_codebook(entry)
