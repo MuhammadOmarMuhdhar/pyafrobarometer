@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -78,7 +78,10 @@ def decode_column(series: pd.Series, labels: dict[int, str]) -> pd.Series:
             return labels[code]
         return value
 
-    return pd.Series([convert(value) for value in series], index=series.index, dtype=object)
+    return cast(
+        pd.Series,
+        pd.Series([convert(value) for value in series], index=series.index, dtype=object),
+    )
 
 
 def normalize_missing(
@@ -93,7 +96,7 @@ def normalize_missing(
         codes = missing_codes(meta, column)
         if codes:
             out[column] = out[column].where(~out[column].isin(codes), pd.NA)
-    return out
+    return cast(pd.DataFrame, out)
 
 
 def variable_info(meta: dict[str, Any]) -> pd.DataFrame:
@@ -116,4 +119,7 @@ def variable_info(meta: dict[str, Any]) -> pd.DataFrame:
                 "missing_codes": missing_codes(meta, name),
             }
         )
-    return pd.DataFrame(rows, columns=["name", "label", "value_labels", "missing_codes"])
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame(rows, columns=["name", "label", "value_labels", "missing_codes"]),
+    )

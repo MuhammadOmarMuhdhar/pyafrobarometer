@@ -47,3 +47,12 @@ def test_extract_requires_a_sav(tmp_path):
         z.writestr("readme.txt", b"x")
     with pytest.raises(CacheError):
         io.safe_extract_sav(archive, tmp_path / "out")
+
+
+def test_extract_ignores_macos_metadata(tmp_path):
+    archive = tmp_path / "x.zip"
+    with zipfile.ZipFile(archive, "w") as z:
+        z.writestr("data.sav", b"y")
+        z.writestr("__MACOSX/._data.sav", b"x")
+    out = io.safe_extract_sav(archive, tmp_path / "out")
+    assert out.name == "data.sav"

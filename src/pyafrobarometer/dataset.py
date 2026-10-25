@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -50,7 +50,7 @@ class Dataset:
         return list(self.provenance.countries)
 
     def variables(self) -> pd.DataFrame:
-        return self._variables.copy()
+        return cast(pd.DataFrame, self._variables.copy())
 
     def _source(self, column: str) -> str:
         return self._source_map.get(column, column)
@@ -71,7 +71,7 @@ class Dataset:
                 mapping = metadata.value_labels(self._meta, source)
                 if mapping:
                     frame[column] = metadata.decode_column(frame[column], mapping)
-        return frame
+        return cast(pd.DataFrame, frame)
 
     def subset(
         self,

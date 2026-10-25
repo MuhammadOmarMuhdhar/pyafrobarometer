@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import zipfile
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pandas as pd
@@ -20,6 +20,9 @@ def safe_extract_sav(archive: Path, dest_dir: Path) -> Path:
         with zipfile.ZipFile(archive) as bundle:
             candidates: list[zipfile.ZipInfo] = []
             for member in bundle.infolist():
+                parts = PurePosixPath(member.filename).parts
+                if any(part == "__MACOSX" or part.startswith("._") for part in parts):
+                    continue
                 if member.is_dir() or not member.filename.lower().endswith(".sav"):
                     continue
                 target = (dest / member.filename).resolve()

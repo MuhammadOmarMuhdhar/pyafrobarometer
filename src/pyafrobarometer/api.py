@@ -8,7 +8,7 @@ import warnings
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -356,7 +356,7 @@ def rounds(refresh: bool = False) -> pd.DataFrame:
         for entry in entries
     ]
     frame = pd.DataFrame(rows, columns=ROUND_COLUMNS)
-    return frame.sort_values(["round", "language"]).reset_index(drop=True)
+    return cast(pd.DataFrame, frame.sort_values(["round", "language"]).reset_index(drop=True))
 
 
 def countries(round: int | None = None, *, refresh: bool = False) -> list[str]:
@@ -412,8 +412,9 @@ def families() -> pd.DataFrame:
         }
         for family, rounds in mapping.items()
     ]
-    return pd.DataFrame(
-        rows, columns=["family", "description", "rounds", "variables"]
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame(rows, columns=["family", "description", "rounds", "variables"]),
     )
 
 
@@ -472,7 +473,7 @@ def load(
     country_values: list[str] = []
     source_map: dict[str, str] = {}
 
-    for path, round_number, entry in plans:
+    for path, round_number, catalog_entry in plans:
         frame, meta, applied, all_countries = _load_one(
             path,
             round_number=round_number,
@@ -481,13 +482,15 @@ def load(
             harmonize_requested=harmonize,
             strict=strict,
         )
-        if entry is not None and entry.year is not None:
-            frame["year"] = entry.year
-            years.append(entry.year)
+        if catalog_entry is not None and catalog_entry.year is not None:
+            frame["year"] = catalog_entry.year
+            years.append(catalog_entry.year)
         frames.append(frame)
         metas.append(meta)
         source_map.update(applied)
-        source_urls.append(entry.data_url if entry is not None else str(path))
+        source_urls.append(
+            catalog_entry.data_url if catalog_entry is not None else str(path)
+        )
         if round_number is not None:
             rounds_used.append(round_number)
         country_values.extend(all_countries)

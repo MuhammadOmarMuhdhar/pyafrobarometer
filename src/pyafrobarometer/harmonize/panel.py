@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import pandas as pd
 
@@ -36,5 +37,5 @@ def concat_frames(
                 working[key] = pd.NA
         prepared.append(working[columns])
     if not prepared:
-        return pd.DataFrame(columns=columns)
+        return cast(pd.DataFrame, pd.DataFrame(columns=columns))
     return pd.concat(prepared, ignore_index=True)

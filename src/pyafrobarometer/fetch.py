@@ -52,7 +52,8 @@ def _require_https(url: str) -> None:
 
 
 def _backoff_seconds(attempt: int) -> float:
-    return min(2.0, 0.5 * (2**attempt))
+    value = 0.5 * (2.0**attempt)
+    return min(value, 2.0)
 
 
 def _retry_delay(response: requests.Response, attempt: int) -> float:
@@ -136,7 +137,7 @@ def download(
             response = http_get(url, timeout=timeout, retries=retries)
             try:
                 content_type = _content_type(response)
-                if content_type not in allowed:
+                if content_type and content_type not in allowed:
                     raise DownloadError(
                         f"Unexpected Content-Type {content_type!r} for {url}; "
                         f"expected one of {', '.join(allowed)}"

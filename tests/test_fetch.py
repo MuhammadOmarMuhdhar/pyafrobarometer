@@ -78,3 +78,9 @@ def test_download_rejects_non_https(tmp_path):
 def test_http_head_returns_status(monkeypatch):
     install(monkeypatch, "head", [response(200)])
     assert fetch.http_head(URL + "/a.sav").status_code == 200
+
+
+def test_download_accepts_missing_content_type(tmp_path, monkeypatch):
+    install(monkeypatch, "get", [response(200, b"x", {})])
+    result = fetch.download(URL + "/a.sav", tmp_path / "a.sav")
+    assert result.size == 1

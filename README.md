@@ -19,40 +19,131 @@ pip install pyafrobarometer
 Optional extras:
 
 ```bash
-pip install "pyafrobarometer[search]"    # fuzzy variable search
-pip install "pyafrobarometer[codebook]"  # PDF codebook text extraction
+pip install "pyafrobarometer[search]"    # fuzzy variable search with rapidfuzz
+pip install "pyafrobarometer[codebook]"  # PDF codebook text extraction with pypdf
 ```
 
 Requires Python 3.10 or newer.
 
-## Usage
+## Quickstart
 
 ```python
 import pyafrobarometer as ab
 
-# What rounds are available?
-print(ab.rounds())
+# Which merged rounds exist?
+print(ab.rounds()[["round", "year", "language", "data_url"]])
 
-# Load Round 9 with value labels and canonical columns.
-ds = ab.load(rounds=9, labels=True, harmonize=True)
+# Which comparative question families are shipped?
+print(ab.families()[["family", "rounds"]])
 
-# A two-round trend for one harmonized variable.
+# Load one round with metadata intact.
+ds = ab.load(rounds=9)
+print(ds)
+print(ds.variables().head())
+print(ds.to_pandas(normalize_missing=True).head())
+
+# Add canonical columns and harmonized question families.
+ds = ab.load(rounds=9, harmonize=True)
+print(ds.to_pandas()[["country", "age", "trust_president"]].head())
+
+# A two-round trend takes three lines.
 panel = ab.panel(rounds=[8, 9], variables=["trust_president"])
-
-# Discover variables without downloading a dataset.
-ab.search_variables("democracy")
+print(panel.to_pandas().groupby("round")["trust_president"].mean())
 ```
 
-Run `pytest` for the offline test suite. Network tests are marked `network` and
-are excluded by default; run them with `pytest -m network`.
+`Dataset` wraps a DataFrame and delegates attribute access, so `ds.head()`,
+`ds["Q37A"]`, `ds.shape`, and `len(ds)` work as expected. `ds.to_pandas()` always
+returns a copy; mutating it never mutates the dataset.
+
+## Rounds, countries, and availability
+
+- Merged rounds 1–10 are supported. Country-level files are discoverable from the
+  Afrobarometer data-sets page; if a country/round is not listed, the package
+  raises `NotFoundError` rather than guessing a URL.
+- Canonical variables (`country`, `respondent_id`, `weight`, `region`,
+  `urban_rural`, `age`, `gender`, `education`, `interview_date`) are mapped per
+  round from a curated YAML crosswalk. A mapping that cannot be verified is
+  omitted with a warning, never guessed.
+- Question families are sparse by design. For example, `social_media_news` is
+  available from Round 6, `trust_army` is missing in Round 4, and Round 1
+  institutional-trust items are recoded from the 1–4 scale to 0–3.
+- `ab.families()` reports each family's available rounds and source variables.
+  `strict=True` (the default) raises `HarmonizationError` when a requested family
+  is unavailable; `strict=False` adds a missing column of `pd.NA` and warns.
+
+## Value labels and missing codes
+
+`ds.to_pandas(labels=True)` decodes value labels from the SPSS metadata.
+`ds.to_pandas(normalize_missing=True)` replaces declared missing codes (`8`, `9`,
+`97`, `98`, `99`, `-1`, and their metadata variants) with `pd.NA`. Default loads
+keep the raw numeric codes.
+
+## Caching, TTL, and offline use
+
+- Downloaded data and codebooks live in the platform cache reported by
+  `ab.cache_dir()`. Set `PYAFROBAROMETER_CACHE_DIR` to override it.
+- The catalog index is cached for seven days. Set `PYAFROBAROMETER_INDEX_TTL`
+  (seconds) to change the TTL, or call `ab.rounds(refresh=True)` to force a
+  refresh.
+- Set `PYAFROBAROMETER_OFFLINE=1` to forbid all network access; the cached index
+  or the baked manifest is used instead.
+- Data files have no TTL and are reused by URL and content hash. `ab.clear_cache()`
+  removes everything; `ab.clear_cache(round=9)` removes only that round.
+
+## Variable search
+
+```python
+ab.search_variables("trust president", rounds=[8, 9], limit=10)
+```
+
+With `rapidfuzz` installed (`[search]` extra), matching is fuzzy; otherwise it is
+case-insensitive substring matching. Search uses the shipped metadata index plus
+any cached round metadata and never downloads a dataset.
+
+## Codebooks
+
+```python
+path = ab.codebook(round=10)                 # downloaded PDF
+text = ab.codebook(round=10, extract_text=True)  # .txt next to the PDF
+```
+
+Text extraction needs the `[codebook]` extra.
+
+## Citation
+
+```python
+print(ab.citation(rounds=[8, 9], countries=["Ghana", "Benin"]))
+print(ab.load(rounds=9).citation())
+```
+
+The required acknowledgment is:
+
+> Afrobarometer Data, [Country(ies)], [Round(s)], [Year(s)], available at
+> http://www.afrobarometer.org.
 
 ## Data policy
 
 - Data and codebooks are stored only in the local cache reported by
   `ab.cache_dir()`.
 - No Afrobarometer microdata, codebooks, or archives are committed to this
-  repository.
-- Downloads use HTTPS from `www.afrobarometer.org`.
+  repository. Downloads use HTTPS from `www.afrobarometer.org` only.
+- Please cite Afrobarometer in publications and follow their
+  [access policy](https://www.afrobarometer.org/data/).
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest            # offline suite; network tests are excluded by default
+pytest -m network # live catalog/crosswalk verification (large downloads)
+ruff check .
+mypy src
+```
+
+A weekly GitHub Actions job refreshes `manifest.json` and `metadata_index.json`,
+validates links and crosswalk coverage, and opens a pull request when they
+change. CI is never in the runtime path: a failed refresh only means the package
+keeps using its cached or baked catalog.
 
 ## License
 

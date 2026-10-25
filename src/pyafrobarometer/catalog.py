@@ -60,6 +60,17 @@ def _anchors(html: str) -> list[tuple[str, str]]:
     return found
 
 
+def _resolve_url(base_url: str, href: str) -> str:
+    url = urljoin(base_url, href)
+    parsed = urlparse(url)
+    if parsed.scheme == "http" and parsed.hostname in (
+        "afrobarometer.org",
+        "www.afrobarometer.org",
+    ):
+        url = parsed._replace(scheme="https", netloc="www.afrobarometer.org").geturl()
+    return url
+
+
 def _filename(url: str) -> str:
     return PurePosixPath(urlparse(url).path).name
 
@@ -84,7 +95,7 @@ def _is_french(text: str, href: str) -> bool:
 def parse_merged_index(html: str, base_url: str) -> list[CatalogEntry]:
     entries: list[CatalogEntry] = []
     for text, href in _anchors(html):
-        url = urljoin(base_url, href)
+        url = _resolve_url(base_url, href)
         filename = _filename(url)
         match = MERGED_TITLE.search(text)
         if match:
@@ -124,7 +135,7 @@ def parse_country_index(html: str, base_url: str) -> list[CatalogEntry]:
         match = COUNTRY_TITLE.match(text.strip())
         if match is None:
             continue
-        url = urljoin(base_url, href)
+        url = _resolve_url(base_url, href)
         entries.append(
             CatalogEntry(
                 kind="country",
@@ -146,7 +157,7 @@ def extract_resource_links(html: str, base_url: str) -> tuple[str | None, str | 
     data_url: str | None = None
     codebook_url: str | None = None
     for _, href in _anchors(html):
-        url = urljoin(base_url, href)
+        url = _resolve_url(base_url, href)
         if data_url is None and _is_data_file(href):
             data_url = url
         elif codebook_url is None and urlparse(href).path.lower().endswith(".pdf"):

@@ -51,3 +51,12 @@ def test_validate_rejects_non_afrobarometer_urls():
     bad = dataclasses.replace(good[0], data_url="https://evil.test/x.sav")
     with pytest.raises(CatalogError):
         catalog.validate_catalog([bad])
+
+
+def test_absolute_http_links_are_upgraded():
+    html = (
+        '<a href="http://www.afrobarometer.org/wp-content/uploads/x.sav">'
+        "Merged Round 9 data (39 countries) (2023)</a>"
+    )
+    entries = catalog.parse_merged_index(html, BASE)
+    assert entries[0].data_url.startswith("https://www.afrobarometer.org/")
