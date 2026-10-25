@@ -75,3 +75,43 @@ def canonical_map() -> dict[str, dict[int, Mapping]]:
             )
         result[str(name)] = rounds
     return result
+
+
+def family_map() -> dict[str, dict[int, Mapping]]:
+    config = _load("crosswalk/questions.yaml")
+    section = config.get("families")
+    if not isinstance(section, dict):
+        raise HarmonizationError("questions.yaml has no families section")
+    result: dict[str, dict[int, Mapping]] = {}
+    for family, spec in section.items():
+        if not isinstance(spec, dict):
+            raise HarmonizationError(f"family {family!r} is not a mapping")
+        rounds_raw = spec.get("rounds")
+        if not isinstance(rounds_raw, dict):
+            raise HarmonizationError(f"family {family!r} has no rounds mapping")
+        rounds: dict[int, Mapping] = {}
+        for key, value in rounds_raw.items():
+            if isinstance(value, str):
+                rounds[int(key)] = Mapping(var=value)
+            elif isinstance(value, dict):
+                variable = value.get("var")
+                if not isinstance(variable, str) or not variable:
+                    raise HarmonizationError(
+                        f"family {family!r} round {key} has no var"
+                    )
+                rounds[int(key)] = Mapping(
+                    var=variable, recode=_recode_map(value.get("recode"))
+                )
+            else:
+                raise HarmonizationError(
+                    f"family {family!r} round {key} must be a string or mapping"
+                )
+        result[str(family)] = rounds
+    return result
+
+
+def family_rounds(family: str) -> list[int]:
+    rounds = family_map().get(family)
+    if rounds is None:
+        raise HarmonizationError(f"Unknown question family: {family}")
+    return sorted(rounds)
