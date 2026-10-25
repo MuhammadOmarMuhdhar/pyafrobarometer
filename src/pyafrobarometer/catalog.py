@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
-from dataclasses import dataclass
-from pathlib import PurePosixPath
-from typing import Literal
+import tempfile
+import time
+import warnings
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path, PurePosixPath
+from typing import Any, Literal
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from pyafrobarometer.errors import CatalogError
+from pyafrobarometer import cache
+from pyafrobarometer.errors import CatalogError, DownloadError
+from pyafrobarometer.fetch import fetch_text
 
 SELECTORS: dict[str, str] = {
     "anchors": "a[href]",
@@ -168,3 +176,139 @@ def validate_catalog(entries: list[CatalogEntry] | tuple[CatalogEntry, ...]) -> 
                 raise CatalogError(
                     f"Catalog entry for round {entry.round} has an invalid {label} URL: {url}"
                 )
+
+
+MANIFEST_PATH = Path(__file__).with_name("manifest.json")
+MERGED_INDEX_URL = "https://www.afrobarometer.org/data/merged-data/"
+DATASETS_INDEX_URL = "https://www.afrobarometer.org/data/data-sets/"
+INDEX_PATH = "index/catalog.json"
+
+
+def _entries_from_payload(payload: Mapping[str, Any]) -> list[CatalogEntry]:
+    raw = payload.get("entries")
+    if not isinstance(raw, list):
+        raise CatalogError("Catalog payload has no entries list")
+    entries: list[CatalogEntry] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise CatalogError("Catalog entry is not an object")
+        try:
+            entries.append(CatalogEntry(**item))
+        except TypeError as exc:
+            raise CatalogError(f"Malformed catalog entry: {exc}") from exc
+    return entries
+
+
+def load_baked_manifest() -> list[CatalogEntry]:
+    try:
+        payload = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CatalogError(f"Could not read baked manifest at {MANIFEST_PATH}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise CatalogError(f"Baked manifest at {MANIFEST_PATH} is not a JSON object")
+    entries = _entries_from_payload(payload)
+    validate_catalog(entries)
+    return entries
+
+
+def _read_cached_index() -> tuple[float, list[CatalogEntry]] | None:
+    path = cache.cache_file(INDEX_PATH)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        fetched_at = float(payload["fetched_at"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    try:
+        entries = _entries_from_payload(payload)
+    except CatalogError:
+        return None
+    return fetched_at, entries
+
+
+def _write_cached_index(entries: Sequence[CatalogEntry], fetched_at: float) -> None:
+    path = cache.cache_file(INDEX_PATH)
+    payload = {
+        "fetched_at": fetched_at,
+        "entries": [asdict(entry) for entry in entries],
+    }
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=".catalog-", suffix=".json")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        os.replace(tmp, path)
+    except OSError as exc:
+        tmp.unlink(missing_ok=True)
+        raise CatalogError(f"Could not write catalog cache at {path}: {exc}") from exc
+
+
+def _follow_resource_page(entry: CatalogEntry) -> CatalogEntry:
+    if _is_data_file(entry.data_url):
+        return entry
+    html = fetch_text(entry.page_url)
+    data_url, codebook_url = extract_resource_links(html, entry.page_url)
+    if data_url is None:
+        return entry
+    return replace(
+        entry,
+        data_url=data_url,
+        codebook_url=codebook_url or entry.codebook_url,
+        filename=_filename(data_url),
+    )
+
+
+def _fetch_catalog() -> list[CatalogEntry]:
+    merged_html = fetch_text(MERGED_INDEX_URL)
+    country_html = fetch_text(DATASETS_INDEX_URL)
+    entries = parse_merged_index(merged_html, MERGED_INDEX_URL)
+    entries.extend(parse_country_index(country_html, DATASETS_INDEX_URL))
+    entries = [
+        _follow_resource_page(entry) if entry.kind == "merged" else entry
+        for entry in entries
+    ]
+    validate_catalog(entries)
+    return entries
+
+
+def resolve_catalog(*, refresh: bool = False) -> list[CatalogEntry]:
+    offline = os.environ.get("PYAFROBAROMETER_OFFLINE") == "1"
+    cached = _read_cached_index()
+    if cached is not None:
+        fetched_at, cached_entries = cached
+        if not refresh and cache.is_fresh(fetched_at):
+            return cached_entries
+
+    if not offline:
+        try:
+            entries = _fetch_catalog()
+        except (CatalogError, DownloadError, OSError, TypeError, ValueError) as exc:
+            if cached is not None:
+                warnings.warn(
+                    f"Could not refresh the Afrobarometer catalog ({exc}); using cached index",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                return cached[1]
+            warnings.warn(
+                f"Could not refresh the Afrobarometer catalog ({exc}); using baked manifest",
+                UserWarning,
+                stacklevel=2,
+            )
+            return load_baked_manifest()
+        _write_cached_index(entries, time.time())
+        state = cache.read_state()
+        state["index_source"] = "live"
+        cache.write_state(state)
+        return entries
+
+    if cached is not None:
+        return cached[1]
+    return load_baked_manifest()

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-25",
+  "entries": [
+    {
+      "kind": "merged",
+      "round": 8,
+      "country": null,
+      "year": 2022,
+      "language": "en",
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2023/03/afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav",
+      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2025/07/R8_Merge-Codebook_28May24.final_.pdf",
+      "page_url": "https://www.afrobarometer.org/data/merged-data/",
+      "filename": "afrobarometer_release-dataset_merge-34ctry_r8_en_2023-03-01.sav",
+      "size_bytes": null
+    },
+    {
+      "kind": "merged",
+      "round": 9,
+      "country": null,
+      "year": 2023,
+      "language": "en",
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2025/06/R9.Merge_39ctry.20Nov23.final_.release_Updated.4Jun25-3.sav",
+      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2025/07/AB_R9.MergeCodebook_25Jun24.final_.pdf",
+      "page_url": "https://www.afrobarometer.org/data/merged-data/",
+      "filename": "R9.Merge_39ctry.20Nov23.final_.release_Updated.4Jun25-3.sav",
+      "size_bytes": null
+    },
+    {
+      "kind": "merged",
+      "round": 10,
+      "country": null,
+      "year": 2025,
+      "language": "en",
+      "data_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip",
+      "codebook_url": "https://www.afrobarometer.org/wp-content/uploads/2026/10/Merge_Round_10_Codebook_09.09.26.pdf",
+      "page_url": "https://www.afrobarometer.org/data/merged-data/",
+      "filename": "AB_R10.Merge-Dataset_25Feb26.38ctry.release.sav.zip",
+      "size_bytes": null
+    }
+  ]
+}
