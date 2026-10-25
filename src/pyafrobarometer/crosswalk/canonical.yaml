@@ -1,0 +1,16 @@
+canonical:
+  country:
+    var: COUNTRY
+    decode_country: true
+    1: {var: country}
+    2: {var: country}
+    3: {var: country}
+    5: {var: COUNTRY_ALPHA, decode_country: false}
+  respondent_id: {var: RESPNO, 1: {var: refnumb}, 2: {var: respno}, 3: {var: respno}}
+  region: {var: REGION, 1: {var: area}, 2: {var: region}, 3: {var: region}}
+  urban_rural: {var: URBRUR, 1: {var: urbrur}, 2: {var: urbrur}, 3: {var: urbrur}}
+  age: {var: Q1, 1: {var: age}, 2: {var: Q80}}
+  gender: {var: Q101, 1: {var: gender}, 2: {var: Q96}, 9: {var: Q100}}
+  education: {var: Q97, 1: {var: educ}, 2: {var: Q84}, 3: {var: Q90}, 4: {var: Q89}, 9: {var: Q94}, 10: {var: Q96}}
+  interview_date: {var: DATEINTR, 1: null, 2: {var: dateintr}, 3: {var: dateintr}}
+  weight: {var: withinwt, 4: {var: Withinwt}, 8: {var: withinwt_ea}, 9: {var: withinwt_ea}, 10: {var: withinwt_ea}}
