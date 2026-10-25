@@ -600,7 +600,7 @@ def panel(
     round_list = _round_list(rounds) or []
     variable_list = _string_list(variables) or []
     frames: list[pd.DataFrame] = []
-    provenances: list[Provenance] = []
+    datasets: list[Dataset] = []
     for round_number in round_list:
         dataset = load(
             rounds=round_number,
@@ -611,8 +611,29 @@ def panel(
             strict=strict,
         )
         frames.append(dataset.to_pandas(labels=labels))
-        provenances.append(dataset.provenance)
+        datasets.append(dataset)
     combined = concat_frames(frames, variables=variable_list)
+    provenances = [dataset.provenance for dataset in datasets]
+    round_meta: dict[int, dict[str, Any]] = {}
+    round_source_map: dict[int, dict[str, str]] = {}
+    variable_frames: list[pd.DataFrame] = []
+    for dataset in datasets:
+        round_meta.update(dataset.round_meta)
+        round_source_map.update(dataset.round_source_map)
+        variable_frames.append(dataset.variables())
+    if variable_frames:
+        variables_frame = pd.concat(variable_frames, ignore_index=True)
+        if variable_list:
+            variables_frame = variables_frame[
+                variables_frame["name"].isin(variable_list)
+            ]
+        variables_frame = variables_frame.drop_duplicates(
+            subset=["name"]
+        ).reset_index(drop=True)
+    else:
+        variables_frame = pd.DataFrame(
+            columns=["name", "label", "value_labels", "missing_codes", "source_var"]
+        )
     provenance = Provenance(
         source_urls=tuple(
             url for item in provenances for url in item.source_urls
@@ -622,15 +643,18 @@ def panel(
         countries=tuple(_string_list(countries) or ()),
         language="en",
         years=tuple(year for item in provenances for year in item.years),
+        codebook_url=next(
+            (item.codebook_url for item in provenances if item.codebook_url), None
+        ),
     )
     return Dataset(
         combined,
-        variables=pd.DataFrame(
-            columns=["name", "label", "value_labels", "missing_codes", "source_var"]
-        ),
+        variables=variables_frame,
         provenance=provenance,
         meta={},
         harmonized=True,
+        round_meta=round_meta,
+        round_source_map=round_source_map,
     )
 
 

@@ -20,3 +20,60 @@ def test_concat_preserves_order_and_adds_round_country():
 def test_concat_missing_column_raises():
     with pytest.raises(HarmonizationError):
         concat_frames([pd.DataFrame({"round": [9]})], variables=["trust_president"])
+
+
+def test_panel_preserves_round_metadata(monkeypatch):
+    from pyafrobarometer import api
+    from pyafrobarometer.dataset import Dataset, Provenance
+
+    def make(round_number, value):
+        df = pd.DataFrame(
+            {
+                "round": [round_number],
+                "country": ["Ghana"],
+                "year": [2020],
+                "gender": [value],
+            }
+        )
+        meta = {
+            "variable_value_labels": {"gender": {9.0: "Don't know"}},
+            "missing_ranges": {},
+        }
+        prov = Provenance(
+            ("https://www.afrobarometer.org/x.sav",),
+            "2026-10-25T00:00:00Z",
+            (round_number,),
+            ("Ghana",),
+            "en",
+            years=(2020,),
+        )
+        variables = pd.DataFrame(
+            [
+                {
+                    "name": "gender",
+                    "label": "Gender",
+                    "value_labels": {9: "Don't know"},
+                    "missing_codes": [9],
+                    "source_var": "gender",
+                }
+            ]
+        )
+        return Dataset(
+            df,
+            variables=variables,
+            provenance=prov,
+            meta={},
+            source_map={"gender": "gender"},
+            harmonized=True,
+            round_meta={round_number: meta},
+            round_source_map={round_number: {"gender": "gender"}},
+        )
+
+    def fake_load(rounds=None, **kwargs):
+        return make(rounds, 9 if rounds == 8 else 1)
+
+    monkeypatch.setattr(api, "load", fake_load)
+    panel = api.panel([8, 9], ["gender"])
+    out = panel.to_pandas(normalize_missing=True)
+    assert out["gender"].isna().tolist() == [True, False]
+    assert set(panel.variables()["name"]) == {"gender"}

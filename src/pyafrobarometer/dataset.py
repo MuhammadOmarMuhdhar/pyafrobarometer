@@ -54,6 +54,17 @@ class Dataset:
     def countries(self) -> list[str]:
         return list(self.provenance.countries)
 
+    @property
+    def round_meta(self) -> dict[int, dict[str, Any]]:
+        return {round_number: dict(meta) for round_number, meta in self._round_meta.items()}
+
+    @property
+    def round_source_map(self) -> dict[int, dict[str, str]]:
+        return {
+            round_number: dict(mapping)
+            for round_number, mapping in self._round_source_map.items()
+        }
+
     def variables(self) -> pd.DataFrame:
         return cast(pd.DataFrame, self._variables.copy())
 

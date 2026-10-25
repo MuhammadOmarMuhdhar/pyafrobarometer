@@ -48,7 +48,8 @@ print(ds.to_pandas()[["country", "age", "trust_president"]].head())
 
 # A two-round trend takes three lines.
 panel = ab.panel(rounds=[8, 9], variables=["trust_president"])
-print(panel.to_pandas().groupby("round")["trust_president"].mean())
+trend = panel.to_pandas(normalize_missing=True)
+print(trend.groupby("round")["trust_president"].mean())
 ```
 
 `Dataset` wraps a DataFrame and delegates attribute access, so `ds.head()`,
