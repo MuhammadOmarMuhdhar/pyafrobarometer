@@ -10,6 +10,11 @@ metadata intact, and harmonize comparable variables across rounds and countries.
 > This package does not redistribute microdata or codebooks; it downloads them
 > to a user-local cache. Please cite Afrobarometer in publications.
 
+## Documentation
+
+Full documentation, including guides and the API reference, is available at
+<https://muhammadomarmuhdhar.github.io/pyafrobarometer/>.
+
 ## Installation
 
 ```bash

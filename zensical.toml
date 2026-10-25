@@ -1,0 +1,50 @@
+[project]
+site_name = "pyafrobarometer"
+site_url = "https://muhammadomarmuhdhar.github.io/pyafrobarometer/"
+site_description = "Programmatic access to Afrobarometer survey data in Python."
+site_author = "pyafrobarometer contributors"
+copyright = "&copy; 2026 pyafrobarometer contributors"
+docs_dir = "docs"
+site_dir = "site"
+repo_url = "https://github.com/MuhammadOmarMuhdhar/pyafrobarometer"
+repo_name = "MuhammadOmarMuhdhar/pyafrobarometer"
+edit_uri = "edit/main/docs/"
+exclude_docs = "superpowers/"
+strict = true
+nav = [
+  { "Home" = "index.md" },
+  { "Getting started" = [
+    "getting-started/installation.md",
+    "getting-started/quickstart.md",
+  ] },
+  { "Guides" = [
+    "guides/discovery.md",
+    "guides/loading.md",
+    "guides/harmonization.md",
+    "guides/panels.md",
+    "guides/labels-and-missing.md",
+    "guides/search.md",
+    "guides/codebooks.md",
+    "guides/caching-and-offline.md",
+    "guides/citation-and-data-policy.md",
+  ] },
+  { "API reference" = [
+    "reference/index.md",
+    "reference/functions.md",
+    "reference/dataset.md",
+    "reference/errors.md",
+  ] },
+  { "Development" = "development.md" },
+]
+
+[project.theme]
+features = [
+  "navigation.tabs",
+  "navigation.sections",
+  "navigation.indexes",
+  "navigation.top",
+  "navigation.tracking",
+  "content.action.edit",
+  "content.action.view",
+  "toc.follow",
+]

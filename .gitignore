@@ -10,6 +10,9 @@ __pycache__/
 build/
 dist/
 
+# Zensical build output
+site/
+
 # Environments
 .venv/
 venv/

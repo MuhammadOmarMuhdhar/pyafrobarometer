@@ -35,6 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 search = ["rapidfuzz"]
 codebook = ["pypdf"]
+docs = ["zensical"]
 dev = [
     "pytest",
     "pytest-cov",
