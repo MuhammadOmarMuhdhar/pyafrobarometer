@@ -7,7 +7,25 @@ from typing import Any, cast
 
 import pandas as pd
 
-FALLBACK_MISSING_CODES = (8, 9, 97, 98, 99, 997, 998, 999, -1)
+FALLBACK_MISSING_CODES = (
+    -1,
+    8,
+    9,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    997,
+    998,
+    999,
+    9994,
+    9995,
+    9998,
+    9999,
+)
 
 
 def _as_int(value: Any) -> int | None:
@@ -45,7 +63,7 @@ def value_labels(meta: dict[str, Any], column: str) -> dict[int, str]:
 
 
 def _looks_missing(label: str) -> bool:
-    text = label.casefold()
+    text = label.casefold().replace("’", "'").replace("‘", "'")
     return bool(re.search(r"\bdk\b", text)) or any(
         word in text
         for word in (

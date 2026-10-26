@@ -44,6 +44,29 @@ def test_decode_column_keeps_unknown_codes():
     assert out.tolist() == ["Benin", "Côte d'Ivoire"]
 
 
+def test_curly_apostrophe_dont_know_is_missing():
+    meta = {
+        "variable_value_labels": {
+            "Q41A": {9: "Don’t know/Haven’t heard enough to say"}
+        }
+    }
+    assert 9 in metadata.missing_codes(meta, "Q41A")
+
+
+def test_not_asked_in_country_codes_are_missing():
+    meta = {
+        "variable_value_labels": {
+            "Q37A": {94: "Not asked in country", 9994: "Not asked in country"}
+        }
+    }
+    assert {94, 9994} <= set(metadata.missing_codes(meta, "Q37A"))
+
+
+def test_valid_code_nine_is_not_missing():
+    meta = {"variable_value_labels": {"Q1": {9: "Nine or more"}}}
+    assert 9 not in metadata.missing_codes(meta, "Q1")
+
+
 def test_country_codes_are_not_treated_as_missing():
     meta = {
         "column_names": ["COUNTRY", "Q37A"],
