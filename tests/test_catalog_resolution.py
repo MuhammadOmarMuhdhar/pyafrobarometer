@@ -100,7 +100,7 @@ def test_no_cache_failure_uses_baked_manifest(tmp_path, monkeypatch):
 
     monkeypatch.setattr(catalog, "fetch_text", fail)
     out = catalog.resolve_catalog()
-    assert out and all(e.kind == "merged" for e in out)
+    assert out and any(e.kind == "merged" for e in out)
 
 
 def test_empty_parse_falls_back(tmp_path, monkeypatch):

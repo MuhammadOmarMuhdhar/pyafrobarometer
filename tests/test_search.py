@@ -35,6 +35,18 @@ INDEX = pd.DataFrame(
 )
 
 
+def test_result_columns_include_concept():
+    out = search.search_variables("trust", index=INDEX, fuzzy=False)
+    assert "concept" in out.columns
+
+
+def test_load_index_fills_missing_optional_columns(monkeypatch):
+    old = pd.DataFrame([{"name": "Q37A", "label": "Trust", "round": 9}])
+    monkeypatch.setattr(search, "_read_index_payload", lambda: old.to_dict("records"))
+    out = search.load_index()
+    assert "concept" in out.columns and "missing_codes" in out.columns
+
+
 def test_substring_search_filters_rounds():
     out = search.search_variables("trust pres", rounds=[8], index=INDEX, fuzzy=False)
     assert out["name"].tolist() == ["Q41A"]

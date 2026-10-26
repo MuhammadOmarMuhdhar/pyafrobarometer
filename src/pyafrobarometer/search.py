@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib.resources
 import json
 from collections.abc import Iterable
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -17,8 +17,10 @@ INDEX_COLUMNS = [
     "round",
     "kind",
     "family",
+    "concept",
     "source_var",
     "value_labels",
+    "missing_codes",
 ]
 RESULT_COLUMNS = [
     "name",
@@ -26,12 +28,13 @@ RESULT_COLUMNS = [
     "round",
     "kind",
     "family",
+    "concept",
     "source_var",
     "score",
 ]
 
 
-def load_index() -> pd.DataFrame:
+def _read_index_payload() -> list[dict[str, Any]]:
     resource = importlib.resources.files("pyafrobarometer").joinpath(
         "metadata_index.json"
     )
@@ -42,7 +45,14 @@ def load_index() -> pd.DataFrame:
     variables = payload.get("variables") if isinstance(payload, dict) else None
     if not isinstance(variables, list):
         raise CatalogError("Metadata index has no variables list")
-    return cast(pd.DataFrame, pd.DataFrame(variables, columns=INDEX_COLUMNS))
+    return [dict(item) for item in variables]
+
+
+def load_index() -> pd.DataFrame:
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame(_read_index_payload()).reindex(columns=INDEX_COLUMNS),
+    )
 
 
 def _round_filter(rounds: int | Iterable[int] | None) -> set[int] | None:
@@ -53,8 +63,10 @@ def _round_filter(rounds: int | Iterable[int] | None) -> set[int] | None:
     return {int(round_number) for round_number in rounds}
 
 
-def _score(query: str, name: str, label: str, family: str, fuzzy: bool) -> float:
-    haystack = f"{name} {label} {family}".casefold()
+def _score(
+    query: str, name: str, label: str, family: str, concept: str, fuzzy: bool
+) -> float:
+    haystack = f"{name} {label} {family} {concept}".casefold()
     needle = query.casefold()
     if fuzzy:
         try:
@@ -74,7 +86,9 @@ def search_variables(
     fuzzy: bool = True,
     index: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    frame = (load_index() if index is None else index.copy())
+    frame = (load_index() if index is None else index.copy()).reindex(
+        columns=INDEX_COLUMNS
+    )
     if frame.empty:
         return cast(pd.DataFrame, pd.DataFrame(columns=RESULT_COLUMNS))
     wanted = _round_filter(rounds)
@@ -91,6 +105,7 @@ def search_variables(
             str(row["name"]),
             str(row["label"]),
             "" if pd.isna(row.get("family")) else str(row.get("family")),
+            "" if pd.isna(row.get("concept")) else str(row.get("concept")),
             fuzzy,
         )
         for _, row in frame.iterrows()

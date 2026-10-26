@@ -38,6 +38,20 @@ def test_merge_metadata_index_replaces_same_round():
     assert [v["round"] for v in out["variables"]] == [9, 10, 10]
 
 
+def test_index_records_include_missing_codes():
+    records = mod._index_records(
+        {
+            "column_names": ["Q37A"],
+            "column_names_to_labels": {"Q37A": "Trust president"},
+            "variable_value_labels": {"Q37A": {9: "Don’t know"}},
+            "missing_ranges": {},
+        },
+        9,
+    )
+    assert records[0]["missing_codes"] == [9]
+    assert "concept" in records[0]
+
+
 def test_validate_links_reports_non_200(monkeypatch):
     class R:
         status_code = 404

@@ -71,17 +71,17 @@ def validate_links(
 
 
 def validate_crosswalk(meta: Mapping[str, Any], round_number: int) -> list[str]:
-    names = set(meta.get("column_names") or [])
+    names = {str(name).casefold() for name in meta.get("column_names") or []}
     problems: list[str] = []
     for canonical, rounds in canonical_map().items():
         spec = rounds.get(round_number)
-        if spec is not None and spec.var not in names:
+        if spec is not None and spec.var.casefold() not in names:
             problems.append(
                 f"canonical {canonical} expects {spec.var} in round {round_number}"
             )
     for family, rounds in family_map().items():
         spec = rounds.get(round_number)
-        if spec is not None and spec.var not in names:
+        if spec is not None and spec.var.casefold() not in names:
             problems.append(
                 f"family {family} expects {spec.var} in round {round_number}"
             )
@@ -127,8 +127,10 @@ def _index_records(
                 "round": round_number,
                 "kind": kind,
                 "family": families_by_var.get(name),
+                "concept": None,
                 "source_var": canonical_sources.get(name) if kind == "canonical" else None,
                 "value_labels": json.dumps(item["value_labels"], ensure_ascii=False),
+                "missing_codes": list(item["missing_codes"]),
             }
         )
     return records
@@ -139,7 +141,7 @@ def _metadata_rounds(value: str | None, entries: Sequence[CatalogEntry]) -> list
     if not available:
         return []
     if value is None:
-        return [available[-1]]
+        return available
     if value == "all":
         return available
     return [int(part) for part in value.split(",") if part.strip()]
