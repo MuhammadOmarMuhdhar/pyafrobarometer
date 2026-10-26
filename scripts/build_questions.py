@@ -3,17 +3,23 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import sys
 import unicodedata
 import warnings
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yaml
 
 from pyafrobarometer import metadata
+from pyafrobarometer.errors import HarmonizationError
+from pyafrobarometer.harmonize import schema
 
 STOPWORDS = {
     "a",
@@ -448,3 +454,278 @@ def build_candidates(
             )
         )
     return result
+
+
+DEFAULT_INDEX = Path("src/pyafrobarometer/metadata_index.json")
+DEFAULT_QUESTIONS = Path("src/pyafrobarometer/crosswalk/questions.yaml")
+DEFAULT_PROPOSED = Path("build/questions.proposed.yaml")
+
+
+def load_index(path: Path) -> pd.DataFrame:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    variables = payload.get("variables") if isinstance(payload, dict) else None
+    if not isinstance(variables, list):
+        raise TypeError(f"{path} has no variables list")
+    return pd.DataFrame(variables)
+
+
+def load_truth(path: Path) -> dict[str, Any]:
+    path = Path(path)
+    if not path.exists():
+        return {"version": 1, "questions": {}}
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        raise TypeError(f"{path} is not a YAML mapping")
+    questions = payload.get("questions")
+    if not isinstance(questions, dict):
+        raise TypeError(f"{path} is not in questions format; run --bootstrap")
+    payload["version"] = int(payload.get("version", 1))
+    return payload
+
+
+def write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.safe_dump(dict(payload), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+
+
+def _sorted_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    questions = payload.get("questions")
+    if not isinstance(questions, dict):
+        questions = {}
+    return {
+        "version": int(payload.get("version", 1)),
+        "questions": {name: questions[name] for name in sorted(questions)},
+    }
+
+
+def candidate_payload(candidate: Candidate) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "description": candidate.description,
+        "kind": candidate.kind,
+    }
+    if candidate.values is not None:
+        payload["values"] = {
+            int(code): str(label) for code, label in sorted(candidate.values.items())
+        }
+    rounds: dict[int, dict[str, Any]] = {}
+    for round_number, entry in sorted(candidate.rounds.items()):
+        round_payload: dict[str, Any] = {
+            "var": entry["var"],
+            "label": entry.get("label", ""),
+        }
+        recode = entry.get("recode") or {}
+        if recode:
+            round_payload["recode"] = {
+                int(code): target for code, target in sorted(recode.items())
+            }
+        missing = entry.get("missing") or []
+        if missing:
+            round_payload["missing"] = sorted(int(code) for code in missing)
+        rounds[int(round_number)] = round_payload
+    payload["rounds"] = rounds
+    return payload
+
+
+def merge_candidate(payload: dict[str, Any], candidate: Candidate) -> bool:
+    questions = payload.setdefault("questions", {})
+    if not isinstance(questions, dict):
+        raise TypeError("questions must be a mapping")
+    existing = questions.get(candidate.name)
+    serialized = candidate_payload(candidate)
+    if existing is None:
+        questions[candidate.name] = serialized
+        return True
+    if not isinstance(existing, dict):
+        return False
+    rounds = existing.setdefault("rounds", {})
+    if not isinstance(rounds, dict):
+        return False
+    changed = False
+    for round_number, entry in serialized["rounds"].items():
+        if round_number not in rounds:
+            rounds[round_number] = entry
+            changed = True
+    return changed
+
+
+def unassigned_repeated_labels(
+    index: pd.DataFrame, truth: Mapping[str, Any]
+) -> list[str]:
+    assigned: set[tuple[int, str]] = set()
+    questions = truth.get("questions")
+    if isinstance(questions, dict):
+        for spec in questions.values():
+            if not isinstance(spec, dict):
+                continue
+            rounds = spec.get("rounds")
+            if not isinstance(rounds, dict):
+                continue
+            for round_number, entry in rounds.items():
+                if not isinstance(entry, dict) or entry.get("exclude"):
+                    continue
+                var = entry.get("var")
+                parsed = _as_int(round_number)
+                if parsed is not None and isinstance(var, str):
+                    assigned.add((parsed, var.casefold()))
+
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for row in index.to_dict("records"):
+        if str(row.get("kind")) != "question":
+            continue
+        round_number = _as_int(row.get("round"))
+        name = row.get("name")
+        if round_number is None or not isinstance(name, str):
+            continue
+        groups.setdefault(normalize_label(row.get("label")), []).append(
+            (round_number, name)
+        )
+
+    unassigned: list[str] = []
+    for label, items in groups.items():
+        rounds = {round_number for round_number, _ in items}
+        if len(rounds) < 2:
+            continue
+        if not any(
+            (round_number, name.casefold()) in assigned
+            for round_number, name in items
+        ):
+            unassigned.append(label)
+    return sorted(unassigned)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--index", type=Path, default=DEFAULT_INDEX)
+    parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
+    parser.add_argument("--proposed", type=Path, default=DEFAULT_PROPOSED)
+    parser.add_argument("--legacy", type=Path)
+    parser.add_argument("--bootstrap", action="store_true")
+    parser.add_argument("--propose", action="store_true")
+    parser.add_argument("--accept-exact", action="store_true")
+    parser.add_argument("--accept", action="append", default=[])
+    parser.add_argument("--validate", action="store_true")
+    parser.add_argument("--strict-coverage", action="store_true")
+    args = parser.parse_args(argv)
+
+    try:
+        index = load_index(args.index)
+        legacy = (
+            legacy_from_yaml(yaml.safe_load(args.legacy.read_text(encoding="utf-8")) or {})
+            if args.legacy
+            else {}
+        )
+        candidates = build_candidates(index, legacy)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError, yaml.YAMLError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    legacy_names = set(legacy)
+    modes = (
+        args.bootstrap,
+        args.propose,
+        args.accept_exact,
+        bool(args.accept),
+        args.validate,
+    )
+    if not any(modes):
+        parser.print_help()
+        return 1
+
+    if args.bootstrap:
+        truth: dict[str, Any] = {"version": 1, "questions": {}}
+        proposed: dict[str, Any] = {"version": 1, "questions": {}}
+        for candidate in candidates:
+            if candidate.name in legacy_names:
+                if candidate.kind == "coded" and candidate.values is None:
+                    print(
+                        f"error: legacy concept {candidate.name} has no inferable values",
+                        file=sys.stderr,
+                    )
+                    return 1
+                merge_candidate(truth, candidate)
+            elif candidate.exact and (
+                candidate.kind == "text" or candidate.values is not None
+            ):
+                merge_candidate(truth, candidate)
+            else:
+                merge_candidate(proposed, candidate)
+        write_yaml(args.questions, _sorted_payload(truth))
+        write_yaml(args.proposed, _sorted_payload(proposed))
+
+    if args.propose:
+        try:
+            truth = load_truth(args.questions)
+        except (OSError, ValueError, TypeError, yaml.YAMLError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        proposed = {"version": 1, "questions": {}}
+        for candidate in candidates:
+            existing = truth["questions"].get(candidate.name)
+            if existing is None:
+                merge_candidate(proposed, candidate)
+                continue
+            rounds = existing.get("rounds") if isinstance(existing, dict) else {}
+            if not isinstance(rounds, dict) or any(
+                round_number not in rounds for round_number in candidate.rounds
+            ):
+                merge_candidate(proposed, candidate)
+        write_yaml(args.proposed, _sorted_payload(proposed))
+
+    if args.accept_exact or args.accept:
+        try:
+            truth = load_truth(args.questions)
+        except (OSError, ValueError, TypeError, yaml.YAMLError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        accepted = set(args.accept)
+        known = {candidate.name for candidate in candidates} | set(
+            truth.get("questions", {})
+        )
+        unknown = sorted(accepted - known)
+        if unknown:
+            print("error: unknown concepts: " + ", ".join(unknown), file=sys.stderr)
+            return 1
+        for candidate in candidates:
+            if args.accept_exact and not (
+                candidate.exact or candidate.name in legacy_names
+            ):
+                continue
+            if accepted and candidate.name not in accepted:
+                continue
+            if candidate.kind == "coded" and candidate.values is None and not accepted:
+                continue
+            merge_candidate(truth, candidate)
+        write_yaml(args.questions, _sorted_payload(truth))
+
+    if args.validate:
+        try:
+            truth = load_truth(args.questions)
+            questions = schema.parse_questions(truth)
+        except (
+            OSError,
+            ValueError,
+            TypeError,
+            yaml.YAMLError,
+            HarmonizationError,
+        ) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        problems = schema.validate_questions(questions, index)
+        unassigned = (
+            unassigned_repeated_labels(index, truth) if args.strict_coverage else []
+        )
+        for problem in problems:
+            print(problem)
+        if unassigned:
+            print("unassigned repeated labels: " + ", ".join(unassigned))
+        return 1 if problems or (args.strict_coverage and unassigned) else 0
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

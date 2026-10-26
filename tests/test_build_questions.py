@@ -150,3 +150,182 @@ def test_fuzzy_merges_wording_variants():
     assert len(candidates) == 1
     assert set(candidates[0].rounds) == {8, 9}
     assert candidates[0].exact is False
+
+
+def write_index(path, rows):
+    path.write_text(json.dumps({"version": 1, "variables": rows}))
+
+
+def bootstrap(tmp_path):
+    index = pd.DataFrame(
+        [
+            row("Q41A", "Trust president", 8, {0: "No", 1: "Yes"}),
+            row("Q37A", "Trust president", 9, {0: "No", 1: "Yes"}),
+            row("Q7", "Economic condition", 8, {0: "Bad", 1: "Good"}),
+            row(
+                "Q8",
+                "Economic condition",
+                9,
+                {0: "Bad", 1: "Good", 2: "Neither"},
+            ),
+        ]
+    )
+    index_path = tmp_path / "index.json"
+    write_index(index_path, index.to_dict("records"))
+    truth = tmp_path / "questions.yaml"
+    proposed = tmp_path / "proposed.yaml"
+    code = mod.main(
+        [
+            "--bootstrap",
+            "--index",
+            str(index_path),
+            "--questions",
+            str(truth),
+            "--proposed",
+            str(proposed),
+        ]
+    )
+    assert code == 0
+    return index_path, truth, proposed
+
+
+def test_bootstrap_writes_exact_to_truth_and_ambiguous_to_proposed(tmp_path):
+    import yaml
+
+    _, truth, proposed = bootstrap(tmp_path)
+    truth_data = yaml.safe_load(truth.read_text())
+    proposed_data = yaml.safe_load(proposed.read_text())
+    assert "trust_president" in truth_data["questions"]
+    assert "economic_condition" in proposed_data["questions"]
+    assert "economic_condition" not in truth_data["questions"]
+
+
+def test_accept_exact_is_idempotent_and_preserves_existing(tmp_path):
+    import yaml
+
+    index_path, truth, _ = bootstrap(tmp_path)
+    data = yaml.safe_load(truth.read_text())
+    data["questions"]["trust_president"]["description"] = "Reviewed description"
+    truth.write_text(yaml.safe_dump(data, sort_keys=False))
+    for _ in range(2):
+        code = mod.main(
+            [
+                "--accept-exact",
+                "--index",
+                str(index_path),
+                "--questions",
+                str(truth),
+            ]
+        )
+        assert code == 0
+    updated = yaml.safe_load(truth.read_text())
+    assert updated["questions"]["trust_president"]["description"] == "Reviewed description"
+    assert len(updated["questions"]) == len(data["questions"])
+
+
+def test_accept_named_merges_one_proposal(tmp_path):
+    import yaml
+
+    index_path, truth, _proposed = bootstrap(tmp_path)
+    code = mod.main(
+        [
+            "--accept",
+            "economic_condition",
+            "--index",
+            str(index_path),
+            "--questions",
+            str(truth),
+        ]
+    )
+    assert code == 0
+    assert "economic_condition" in yaml.safe_load(truth.read_text())["questions"]
+
+
+def test_validate_reports_bad_var_and_returns_one(tmp_path, capsys):
+    import yaml
+
+    index_path = tmp_path / "index.json"
+    write_index(
+        index_path,
+        [row("Q37A", "Trust president", 9, {0: "No", 1: "Yes"})],
+    )
+    truth = tmp_path / "questions.yaml"
+    truth.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "questions": {
+                    "bad": {
+                        "description": "Bad",
+                        "kind": "coded",
+                        "values": {0: "No"},
+                        "rounds": {9: {"var": "NOPE", "label": "Bad"}},
+                    }
+                },
+            },
+            sort_keys=False,
+        )
+    )
+    code = mod.main(
+        ["--validate", "--index", str(index_path), "--questions", str(truth)]
+    )
+    output = capsys.readouterr()
+    assert code == 1
+    assert "NOPE" in output.out + output.err
+
+
+def test_strict_coverage_fails_unassigned_repeated_label(tmp_path):
+    import yaml
+
+    index_path = tmp_path / "index.json"
+    write_index(
+        index_path,
+        [
+            row("Q41A", "Trust president", 8, {0: "No", 1: "Yes"}),
+            row("Q37A", "Trust president", 9, {0: "No", 1: "Yes"}),
+        ],
+    )
+    truth = tmp_path / "questions.yaml"
+    truth.write_text("version: 1\nquestions: {}\n")
+    code = mod.main(
+        [
+            "--validate",
+            "--strict-coverage",
+            "--index",
+            str(index_path),
+            "--questions",
+            str(truth),
+        ]
+    )
+    assert code == 1
+
+    truth.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "questions": {
+                    "trust_president": {
+                        "description": "Trust president",
+                        "kind": "coded",
+                        "values": {0: "No", 1: "Yes"},
+                        "rounds": {
+                            8: {"var": "Q41A", "label": "Trust president"},
+                            9: {"var": "Q37A", "label": "Trust president"},
+                        },
+                    }
+                },
+            },
+            sort_keys=False,
+        )
+    )
+    code = mod.main(
+        [
+            "--validate",
+            "--strict-coverage",
+            "--index",
+            str(index_path),
+            "--questions",
+            str(truth),
+        ]
+    )
+    assert code == 0
