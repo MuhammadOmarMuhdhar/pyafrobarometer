@@ -34,6 +34,15 @@ def test_apply_families():
     assert mapping == {"trust_president": "Q37A", "trust_parliament": "Q37B"}
 
 
+def test_lowercase_source_variable_resolves():
+    df = pd.DataFrame({"q43a": [0, 3]})
+    out, mapping = canonical.apply_families(
+        df, round_number=2, families=["trust_president"]
+    )
+    assert out["trust_president"].tolist() == [0, 3]
+    assert mapping["trust_president"] == "q43a"
+
+
 def test_r1_trust_recode():
     df = pd.DataFrame({"trspre": [1, 2, 3, 4]})
     out, mapping = canonical.apply_families(

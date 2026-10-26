@@ -75,6 +75,15 @@ def test_apply_canonical_r9():
     assert mapping["education"] == "Q94"
 
 
+def test_apply_canonical_r2_lowercase_names():
+    df = pd.DataFrame({"country": [3], "respno": ["A"], "q80": [30], "q96": [1]})
+    out, mapping = canonical.apply_canonical(
+        df, round_number=2, meta=meta_for(list(df.columns))
+    )
+    assert out["age"].tolist() == [30]
+    assert mapping["age"] == "q80"
+
+
 def test_missing_mapping_is_omitted_with_warning():
     df = pd.DataFrame({"COUNTRY": [3]})
     with pytest.warns(UserWarning):

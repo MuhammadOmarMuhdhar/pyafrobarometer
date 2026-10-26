@@ -11,6 +11,7 @@ import pandas as pd
 from pyafrobarometer import metadata
 from pyafrobarometer.errors import HarmonizationError
 from pyafrobarometer.harmonize.crosswalk import Mapping, canonical_map, family_map
+from pyafrobarometer.harmonize.schema import resolve_column
 
 
 def _recode(series: pd.Series, recode: dict[int, int]) -> pd.Series:
@@ -41,7 +42,8 @@ def apply_canonical(
         source = spec.var
         if name == "weight" and "withinwt_hh" in df.columns:
             source = "withinwt_hh"
-        if source not in df.columns:
+        actual = resolve_column(source, df.columns)
+        if actual is None:
             warnings.warn(
                 f"Canonical variable {name!r} needs {source!r}, which is absent in "
                 f"round {round_number}; omitting it",
@@ -49,15 +51,15 @@ def apply_canonical(
                 stacklevel=2,
             )
             continue
-        series = df[source]
+        series = df[actual]
         if spec.recode:
             series = _recode(series, spec.recode)
         if spec.decode_country:
             series = metadata.decode_column(
-                series, metadata.value_labels(meta, source)
+                series, metadata.value_labels(meta, actual)
             )
         frame[name] = series
-        applied[name] = source
+        applied[name] = actual
     return frame, applied
 
 
@@ -86,7 +88,8 @@ def apply_families(
             warnings.warn(message, UserWarning, stacklevel=2)
             frame[family] = pd.NA
             continue
-        if spec.var not in df.columns:
+        actual = resolve_column(spec.var, df.columns)
+        if actual is None:
             message = (
                 f"{family} maps to {spec.var!r} in round {round_number}, but that "
                 "variable is absent from this file"
@@ -96,9 +99,9 @@ def apply_families(
             warnings.warn(message, UserWarning, stacklevel=2)
             frame[family] = pd.NA
             continue
-        series = df[spec.var]
+        series = df[actual]
         if spec.recode:
             series = _recode(series, spec.recode)
         frame[family] = series
-        applied[family] = spec.var
+        applied[family] = actual
     return frame, applied

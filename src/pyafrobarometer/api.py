@@ -32,6 +32,7 @@ from pyafrobarometer.harmonize.crosswalk import (
     family_map,
 )
 from pyafrobarometer.harmonize.panel import concat_frames
+from pyafrobarometer.harmonize.schema import resolve_column
 from pyafrobarometer.names import normalize_country
 
 ROUND_COLUMNS = ["round", "year", "countries", "data_url", "codebook_url", "language"]
@@ -208,14 +209,15 @@ def _download_entry(entry: CatalogEntry) -> Path:
 
 def _country_values(frame: pd.DataFrame, meta: dict[str, Any]) -> pd.Series | None:
     for name in ("country", "COUNTRY", "COUNTRY_ALPHA"):
-        if name not in frame.columns:
+        actual = name if name in frame.columns else resolve_column(name, frame.columns)
+        if actual is None:
             continue
-        if name == "COUNTRY_ALPHA":
-            return frame[name]
-        labels = metadata.value_labels(meta, name)
+        if actual.casefold() == "country_alpha":
+            return frame[actual]
+        labels = metadata.value_labels(meta, actual)
         if labels:
-            return metadata.decode_column(frame[name], labels)
-        return frame[name]
+            return metadata.decode_column(frame[actual], labels)
+        return frame[actual]
     return None
 
 
@@ -271,17 +273,24 @@ def _select_usecols(
     variables: list[str] | None,
     harmonize_requested: bool,
 ) -> list[str] | None:
-    names = set(meta.get("column_names") or [])
+    names = list(meta.get("column_names") or [])
     if not harmonize_requested and variables is None:
         return None
-    needed = {name for name in ("country", "COUNTRY", "COUNTRY_ALPHA") if name in names}
+    needed: set[str] = set()
+    for name in ("country", "COUNTRY", "COUNTRY_ALPHA"):
+        actual = name if name in names else resolve_column(name, names)
+        if actual is not None:
+            needed.add(actual)
     if harmonize_requested and round_number is not None:
         for rounds in canonical_map().values():
             spec = rounds.get(round_number)
-            if spec is not None and spec.var in names:
-                needed.add(spec.var)
-        if "withinwt_hh" in names:
-            needed.add("withinwt_hh")
+            if spec is not None:
+                actual = resolve_column(spec.var, names)
+                if actual is not None:
+                    needed.add(actual)
+        actual_within = resolve_column("withinwt_hh", names)
+        if actual_within is not None:
+            needed.add(actual_within)
         families = family_map()
         selected = (
             list(families)
@@ -290,12 +299,15 @@ def _select_usecols(
         )
         for family in selected:
             spec = families[family].get(round_number)
-            if spec is not None and spec.var in names:
-                needed.add(spec.var)
+            if spec is not None:
+                actual = resolve_column(spec.var, names)
+                if actual is not None:
+                    needed.add(actual)
     elif variables is not None:
         for variable in variables:
-            if variable in names:
-                needed.add(variable)
+            actual = resolve_column(variable, names)
+            if actual is not None:
+                needed.add(actual)
     return sorted(needed) or None
 
 
@@ -351,7 +363,7 @@ def _load_one(
                 name
                 for name, rounds in families.items()
                 if round_number in rounds
-                and rounds[round_number].var in frame.columns
+                and resolve_column(rounds[round_number].var, frame.columns) is not None
             ]
         else:
             unknown = [
