@@ -76,4 +76,4 @@ a failed download, and text extraction without the `[codebook]` extra.
 
 - [Functions](functions.md)
 - [`Dataset`](dataset.md)
-- [Troubleshooting patterns](../guides/loading.md)
+- [Troubleshooting patterns](../guide/loading.md)

@@ -6,7 +6,7 @@ shipped metadata index for variable names, labels, and question families.
 ```python
 import pyafrobarometer as ab
 
-matches = ab.search_variables("trust president", rounds=[8, 9], limit=10)
+matches = ab.search_variables("trust president", rounds=[8, 9, 10], limit=10)
 print(matches[["name", "label", "round", "family", "score"]])
 ```
 
@@ -14,9 +14,7 @@ Search never downloads a dataset. It reads `metadata_index.json`, which ships
 with the package for merged rounds 1–10 and is refreshed by the weekly catalog
 job.
 
-## Results
-
-The returned DataFrame has these columns:
+## Result columns
 
 | Column | Meaning |
 | --- | --- |
@@ -26,7 +24,7 @@ The returned DataFrame has these columns:
 | `kind` | Entry kind recorded in the index |
 | `family` | Harmonized family, when the variable belongs to one |
 | `source_var` | Source variable for the family |
-| `score` | Match score; `100` for an exact substring match |
+| `score` | Match score; `100` for a substring match |
 
 Results are sorted by score and then by round, highest first.
 
@@ -34,14 +32,11 @@ Results are sorted by score and then by round, highest first.
 
 With `rapidfuzz` installed (the `[search]` extra), matching uses fuzzy scoring
 and keeps scores of 60 or higher. Without it, matching falls back to
-case-insensitive substring matching:
+case-insensitive substring matching.
 
 ```python
-# Fuzzy by default when rapidfuzz is installed.
-ab.search_variables("trust pres")
-
-# Force substring matching.
-ab.search_variables("trust president", fuzzy=False)
+ab.search_variables("trust pres")                  # fuzzy when available
+ab.search_variables("trust president", fuzzy=False)  # substring
 ```
 
 ## Filtering and limits
@@ -54,8 +49,20 @@ ab.search_variables("internet", rounds=[5, 6, 7, 8, 9, 10])
 `limit` caps the number of rows. A non-positive limit returns an empty DataFrame
 with the result columns.
 
+## From search to load
+
+Use the result to choose a family or source variable:
+
+```python
+match = ab.search_variables("trust president", rounds=9, limit=1).iloc[0]
+print(match["family"], match["name"])
+
+ds = ab.load(rounds=9, harmonize=True, variables=[match["family"]])
+```
+
 ## See also
 
-- [Discovery](discovery.md)
-- [`families()`](../reference/functions.md#families)
+- [Question families](families.md)
+- [Selecting variables](selecting-variables.md)
 - [`search_variables()`](../reference/functions.md#search_variables)
+- [Installation](index.md#installation)

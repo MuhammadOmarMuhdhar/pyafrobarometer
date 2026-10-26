@@ -19,7 +19,7 @@ metadata intact, and harmonize comparable variables across rounds and countries.
 pip install pyafrobarometer
 ```
 
-Requires Python 3.10 or newer. See [Installation](getting-started/installation.md)
+Requires Python 3.10 or newer. See [Installation](guide/index.md#installation)
 for optional extras.
 
 ## Quick example
@@ -52,9 +52,8 @@ print(trend.groupby("round")["trust_president"].mean())
 
 ## Where to go next
 
-- [Installation](getting-started/installation.md)
-- [Quickstart](getting-started/quickstart.md)
-- [Discovery](guides/discovery.md)
-- [Loading data](guides/loading.md)
-- [Harmonization](guides/harmonization.md)
+- [Tutorial](tutorial/index.md) — a short end-to-end analysis.
+- [Guide](guide/index.md) — every major feature explained in depth.
+- [Afrobarometer concepts](guide/concepts.md)
 - [API reference](reference/index.md)
+- [Development](development.md)

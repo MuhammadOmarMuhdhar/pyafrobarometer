@@ -160,4 +160,4 @@ print(ds.provenance.rounds, ds.provenance.years)
 
 - [Functions](functions.md)
 - [Errors](errors.md)
-- [Loading data](../guides/loading.md)
+- [Loading data](../guide/loading.md)

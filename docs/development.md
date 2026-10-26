@@ -102,4 +102,4 @@ After that, pushes to `main` that touch `docs/`, `zensical.toml`, or
 Never commit Afrobarometer microdata, archives, or codebooks. The `.gitignore`
 excludes `*.sav`, `*.zip`, and `*.pdf`. The package downloads data into the local
 cache at runtime. See
-[Citation and data policy](guides/citation-and-data-policy.md).
+[Data policy](guide/data-policy.md).
