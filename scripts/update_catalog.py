@@ -16,7 +16,11 @@ from typing import Any
 from pyafrobarometer import api, fetch, io, metadata
 from pyafrobarometer.catalog import CatalogEntry, resolve_catalog
 from pyafrobarometer.errors import DownloadError
-from pyafrobarometer.harmonize.crosswalk import canonical_map, family_map
+from pyafrobarometer.harmonize.crosswalk import (
+    LEGACY_QUESTIONS,
+    canonical_map,
+    question_map,
+)
 
 PACKAGE_DIR = Path(__file__).resolve().parents[1] / "src" / "pyafrobarometer"
 MANIFEST_PATH = PACKAGE_DIR / "manifest.json"
@@ -79,11 +83,13 @@ def validate_crosswalk(meta: Mapping[str, Any], round_number: int) -> list[str]:
             problems.append(
                 f"canonical {canonical} expects {spec.var} in round {round_number}"
             )
-    for family, rounds in family_map().items():
-        spec = rounds.get(round_number)
-        if spec is not None and spec.var.casefold() not in names:
+    for concept, question in question_map().items():
+        entry = question.rounds.get(round_number)
+        if entry is None or entry.exclude or entry.var is None:
+            continue
+        if entry.var.casefold() not in names:
             problems.append(
-                f"family {family} expects {spec.var} in round {round_number}"
+                f"question {concept} expects {entry.var} in round {round_number}"
             )
     return problems
 
@@ -109,26 +115,31 @@ def _index_records(
     for canonical, rounds in canonical_map().items():
         spec = rounds.get(round_number)
         if spec is not None:
-            canonical_sources[spec.var] = canonical
-    families_by_var: dict[str, str] = {}
-    for family, rounds in family_map().items():
-        spec = rounds.get(round_number)
-        if spec is not None:
-            families_by_var[spec.var] = family
+            canonical_sources[spec.var.casefold()] = canonical
+    concepts_by_var: dict[str, str] = {}
+    for concept, question in question_map().items():
+        entry = question.rounds.get(round_number)
+        if entry is not None and not entry.exclude and entry.var:
+            concepts_by_var[entry.var.casefold()] = concept
 
+    legacy = set(LEGACY_QUESTIONS)
     records: list[dict[str, Any]] = []
     for item in metadata.variable_info(dict(meta)).to_dict("records"):
         name = str(item["name"])
-        kind = "canonical" if name in canonical_sources else "question"
+        canonical = canonical_sources.get(name.casefold())
+        kind = "canonical" if canonical is not None else "question"
+        concept = canonical if canonical is not None else concepts_by_var.get(
+            name.casefold()
+        )
         records.append(
             {
                 "name": name,
                 "label": str(item["label"]),
                 "round": round_number,
                 "kind": kind,
-                "family": families_by_var.get(name),
-                "concept": None,
-                "source_var": canonical_sources.get(name) if kind == "canonical" else None,
+                "family": concept if concept in legacy else None,
+                "concept": concept,
+                "source_var": canonical if kind == "canonical" else None,
                 "value_labels": json.dumps(item["value_labels"], ensure_ascii=False),
                 "missing_codes": list(item["missing_codes"]),
             }

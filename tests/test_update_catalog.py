@@ -52,6 +52,80 @@ def test_index_records_include_missing_codes():
     assert "concept" in records[0]
 
 
+def test_index_records_tag_concept_and_legacy_family():
+    records = mod._index_records(
+        {
+            "column_names": ["Q37A", "Q35B"],
+            "column_names_to_labels": {
+                "Q37A": "Trust president",
+                "Q35B": "Access information",
+            },
+            "variable_value_labels": {"Q37A": {0: "No"}, "Q35B": {0: "No"}},
+            "missing_ranges": {},
+        },
+        9,
+    )
+    by_name = {record["name"]: record for record in records}
+    assert by_name["Q37A"]["concept"] == "trust_president"
+    assert by_name["Q37A"]["family"] == "trust_president"
+    assert (
+        by_name["Q35B"]["concept"]
+        == "access_information_local_government_development_plan_budget"
+    )
+    assert by_name["Q35B"]["family"] is None
+
+
+def test_index_records_tag_canonical_concept():
+    records = mod._index_records(
+        {
+            "column_names": ["COUNTRY"],
+            "column_names_to_labels": {"COUNTRY": "Country"},
+            "variable_value_labels": {"COUNTRY": {3: "Benin"}},
+            "missing_ranges": {},
+        },
+        9,
+    )
+    assert records[0]["kind"] == "canonical"
+    assert records[0]["concept"] == "country"
+    assert records[0]["source_var"] == "country"
+    assert records[0]["family"] is None
+
+
+def test_validate_crosswalk_reports_missing_non_legacy_question():
+    from pyafrobarometer.harmonize.crosswalk import canonical_map, question_map
+
+    names = set()
+    for rounds in canonical_map().values():
+        spec = rounds.get(9)
+        if spec is not None:
+            names.add(spec.var)
+    for question in question_map().values():
+        entry = question.rounds.get(9)
+        if entry is not None and not entry.exclude and entry.var:
+            names.add(entry.var)
+    names.discard("Q35B")
+    problems = mod.validate_crosswalk({"column_names": sorted(names)}, 9)
+    assert any(
+        "access_information_local_government_development_plan_budget" in problem
+        for problem in problems
+    )
+
+
+def test_validate_crosswalk_accepts_lowercase_r2_sources():
+    from pyafrobarometer.harmonize.crosswalk import canonical_map, question_map
+
+    names = set()
+    for rounds in canonical_map().values():
+        spec = rounds.get(2)
+        if spec is not None:
+            names.add(spec.var.lower())
+    for question in question_map().values():
+        entry = question.rounds.get(2)
+        if entry is not None and not entry.exclude and entry.var:
+            names.add(entry.var.lower())
+    assert mod.validate_crosswalk({"column_names": sorted(names)}, 2) == []
+
+
 def test_validate_links_reports_non_200(monkeypatch):
     class R:
         status_code = 404
