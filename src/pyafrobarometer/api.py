@@ -608,20 +608,88 @@ def countries(round: int | None = None, *, refresh: bool = False) -> list[str]:
     )
 
 
+def questions() -> pd.DataFrame:
+    rows = [
+        {
+            "name": name,
+            "description": spec.description,
+            "kind": spec.kind,
+            "rounds": sorted(
+                round_number
+                for round_number, entry in spec.rounds.items()
+                if not entry.exclude
+            ),
+            "variables": {
+                round_number: entry.var
+                for round_number, entry in sorted(spec.rounds.items())
+                if not entry.exclude and entry.var is not None
+            },
+            "values": spec.values.copy(),
+        }
+        for name, spec in sorted(question_map().items())
+    ]
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame(
+            rows,
+            columns=["name", "description", "kind", "rounds", "variables", "values"],
+        ),
+    )
+
+
+def question(name: str) -> pd.DataFrame:
+    spec = question_map().get(name)
+    if spec is None:
+        raise HarmonizationError(f"Unknown question: {name}")
+    rows = [
+        {
+            "round": round_number,
+            "var": entry.var,
+            "label": entry.label,
+            "recode": dict(entry.recode),
+            "missing": list(entry.missing),
+            "excluded": entry.exclude,
+            "reason": entry.reason,
+        }
+        for round_number, entry in sorted(spec.rounds.items())
+    ]
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame(
+            rows,
+            columns=[
+                "round",
+                "var",
+                "label",
+                "recode",
+                "missing",
+                "excluded",
+                "reason",
+            ],
+        ),
+    )
+
+
 def families() -> pd.DataFrame:
+    warnings.warn(
+        "families() is deprecated; use questions() instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     mapping = family_map()
     descriptions = family_descriptions()
     rows = [
         {
             "family": family,
             "description": descriptions.get(family, ""),
-            "rounds": sorted(rounds),
+            "rounds": sorted(mapping[family]),
             "variables": {
                 round_number: item.var
-                for round_number, item in sorted(rounds.items())
+                for round_number, item in sorted(mapping[family].items())
             },
         }
-        for family, rounds in mapping.items()
+        for family in LEGACY_QUESTIONS
+        if family in mapping
     ]
     return cast(
         pd.DataFrame,

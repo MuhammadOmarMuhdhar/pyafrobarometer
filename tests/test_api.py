@@ -146,12 +146,61 @@ def test_rounds_and_countries_from_catalog(monkeypatch, tmp_path):
 
 
 def test_families_lists_sparse_availability():
-    out = ab.families()
+    with pytest.warns(DeprecationWarning):
+        out = ab.families()
     row = out.loc[out["family"] == "social_media_news"].iloc[0]
     assert row["rounds"] == [6, 7, 8, 9, 10]
     assert "Q12E" in row["variables"].values()
     army = out.loc[out["family"] == "trust_army"].iloc[0]
     assert army["rounds"] == [1, 2, 3, 5, 6, 7, 8, 9, 10]
+
+
+def test_questions_lists_all_concepts():
+    from pyafrobarometer.harmonize.crosswalk import LEGACY_QUESTIONS
+
+    out = ab.questions()
+    assert list(out.columns) == [
+        "name",
+        "description",
+        "kind",
+        "rounds",
+        "variables",
+        "values",
+    ]
+    names = set(out["name"])
+    assert "trust_president" in names
+    assert names - set(LEGACY_QUESTIONS)
+
+
+def test_question_returns_per_round_rows():
+    out = ab.question("trust_president")
+    assert list(out.columns) == [
+        "round",
+        "var",
+        "label",
+        "recode",
+        "missing",
+        "excluded",
+        "reason",
+    ]
+    assert out["round"].tolist() == list(range(1, 11))
+    assert out.loc[out["round"] == 9, "var"].iloc[0] == "Q37A"
+    assert bool(out.loc[out["round"] == 9, "excluded"].iloc[0]) is False
+
+
+def test_question_unknown_name_raises():
+    with pytest.raises(ab.HarmonizationError, match="nope"):
+        ab.question("nope")
+
+
+def test_families_is_deprecated_and_legacy_only():
+    from pyafrobarometer.harmonize.crosswalk import LEGACY_QUESTIONS
+
+    with pytest.warns(DeprecationWarning):
+        out = ab.families()
+    assert list(out.columns) == ["family", "description", "rounds", "variables"]
+    assert len(out) == 32
+    assert set(out["family"]) == set(LEGACY_QUESTIONS)
 
 
 def test_second_load_reuses_cached_download(monkeypatch, tmp_path):

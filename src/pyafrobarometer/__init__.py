@@ -13,6 +13,8 @@ from pyafrobarometer.api import (
     families,
     load,
     panel,
+    question,
+    questions,
     rounds,
     search_variables,
 )
@@ -46,6 +48,8 @@ __all__ = [
     "families",
     "load",
     "panel",
+    "question",
+    "questions",
     "rounds",
     "search_variables",
 ]

@@ -16,3 +16,10 @@ def test_public_errors_are_exported():
         "CodebookError",
     ]:
         assert hasattr(ab, name)
+
+
+def test_question_apis_are_exported():
+    assert hasattr(ab, "questions")
+    assert hasattr(ab, "question")
+    assert "questions" in ab.__all__
+    assert "question" in ab.__all__
