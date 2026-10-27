@@ -43,7 +43,7 @@ def test_to_pandas_modes():
     assert labelled["Q37A"].astype(str).tolist() == ["No", "DK"]
 
 
-def test_source_map_applies_metadata_to_a_family_column():
+def test_concept_column_uses_target_labels():
     df = pd.DataFrame({"Q37A": [0, 9], "trust_president": [0, 9]})
     prov = Provenance(
         ("https://www.afrobarometer.org/x.sav",),
@@ -61,7 +61,66 @@ def test_source_map_applies_metadata_to_a_family_column():
     )
     out = ds.to_pandas(normalize_missing=True, labels=True)
     values = out["trust_president"].tolist()
-    assert values[0] == "No" and pd.isna(values[1])
+    assert values[0] == "Not at all" and pd.isna(values[1])
+
+
+def test_to_pandas_uses_target_labels_across_rounds():
+    df = pd.DataFrame({"round": [9], "trust_president": [1]})
+    meta = {
+        "variable_value_labels": {"Q37A": {1.0: "Source label"}},
+        "missing_ranges": {},
+    }
+    prov = Provenance(
+        ("https://www.afrobarometer.org/x.sav",),
+        "2026-10-25T00:00:00Z",
+        (9,),
+        ("Benin",),
+        "en",
+    )
+    ds = Dataset(
+        df,
+        variables=pd.DataFrame(
+            columns=["name", "label", "value_labels", "missing_codes"]
+        ),
+        provenance=prov,
+        meta={},
+        source_map={"trust_president": "Q37A"},
+        harmonized=True,
+        round_meta={9: meta},
+        round_source_map={9: {"trust_president": "Q37A"}},
+    )
+    assert ds.to_pandas(labels=True)["trust_president"].tolist() == [
+        "Just a little"
+    ]
+
+
+def test_to_pandas_does_not_decode_text_concepts():
+    df = pd.DataFrame({"round": [9], "interviewers_comment_verbatim": [1]})
+    meta = {
+        "variable_value_labels": {"Q119v": {1.0: "Ignored"}},
+        "missing_ranges": {},
+    }
+    prov = Provenance(
+        ("https://www.afrobarometer.org/x.sav",),
+        "2026-10-25T00:00:00Z",
+        (9,),
+        ("Benin",),
+        "en",
+    )
+    ds = Dataset(
+        df,
+        variables=pd.DataFrame(
+            columns=["name", "label", "value_labels", "missing_codes"]
+        ),
+        provenance=prov,
+        meta={},
+        source_map={"interviewers_comment_verbatim": "Q119v"},
+        harmonized=True,
+        round_meta={9: meta},
+        round_source_map={9: {"interviewers_comment_verbatim": "Q119v"}},
+    )
+    assert ds.to_pandas(labels=True)["interviewers_comment_verbatim"].tolist() == [1]
+
 
 
 def test_subset_and_pickle():

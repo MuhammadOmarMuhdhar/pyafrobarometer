@@ -359,3 +359,80 @@ def test_country_filter_uses_merged_entry(monkeypatch, tmp_path):
     ds = ab.load(rounds=9, countries=["Ghana"], harmonize=True)
     assert seen and seen[0].kind == "merged"
     assert ds.countries == ["Ghana"]
+
+
+def test_harmonized_missing_codes_become_na_without_normalize_missing(tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    ds = ab.load(rounds=9, source=p, harmonize=True)
+    values = ds.to_pandas()["trust_president"].tolist()
+    assert values[0] == 0
+    assert pd.isna(values[1])
+
+
+def test_variables_include_source_vars_mapping(tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    ds = ab.load(
+        rounds=9, source=p, harmonize=True, variables=["trust_president"]
+    )
+    variables = ds.variables()
+    row = variables.loc[variables["name"] == "trust_president"].iloc[0]
+    assert row["source_vars"] == {9: "Q37A"}
+    assert row["value_labels"][0] == "Not at all"
+    assert 9 not in row["value_labels"]
+
+
+def test_unknown_harmonized_concept_strict_and_non_strict(tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    with pytest.raises(ab.HarmonizationError, match="NOPE"):
+        ab.load(rounds=9, source=p, harmonize=True, variables=["NOPE"])
+    with pytest.warns(UserWarning, match="NOPE"):
+        ds = ab.load(
+            rounds=9,
+            source=p,
+            harmonize=True,
+            variables=["NOPE"],
+            strict=False,
+        )
+    assert "NOPE" not in ds.to_pandas().columns
+
+
+def test_harmonized_concept_selects_source_in_usecols(monkeypatch, tmp_path):
+    p = tmp_path / "r9.sav"
+    write_sav(p)
+    captured = {}
+    original = api.io.read_frame
+
+    def spy(path, **kwargs):
+        captured["usecols"] = kwargs.get("usecols")
+        return original(path, **kwargs)
+
+    monkeypatch.setattr(api.io, "read_frame", spy)
+    ab.load(
+        rounds=9, source=p, harmonize=True, variables=["trust_president"]
+    )
+    assert captured["usecols"] is not None
+    assert "Q37A" in captured["usecols"]
+
+
+def test_lowercase_source_harmonizes_to_concept(tmp_path):
+    p = tmp_path / "r2.sav"
+    df = pd.DataFrame(
+        {
+            "COUNTRY": [3, 3],
+            "RESPNO": ["A", "B"],
+            "URBRUR": [1, 2],
+            "q43a": [0, 3],
+        }
+    )
+    pyreadstat.write_sav(
+        df,
+        str(p),
+        variable_value_labels={"COUNTRY": {3: "Benin"}},
+    )
+    ds = ab.load(
+        rounds=2, source=p, harmonize=True, variables=["trust_president"]
+    )
+    assert ds.to_pandas()["trust_president"].tolist() == [0, 3]

@@ -10,6 +10,7 @@ import pandas as pd
 
 from pyafrobarometer import metadata
 from pyafrobarometer.errors import CodebookError, HarmonizationError
+from pyafrobarometer.harmonize.crosswalk import question_map
 from pyafrobarometer.names import normalize_country
 
 
@@ -78,8 +79,12 @@ class Dataset:
         normalize_missing: bool = False,
     ) -> pd.DataFrame:
         frame = self._df.copy()
+        questions = question_map()
         if self._round_meta and "round" in frame.columns:
             for column in frame.columns:
+                question = questions.get(str(column))
+                if question is not None and question.kind == "text":
+                    continue
                 result = frame[column].astype(object)
                 for round_number, meta in self._round_meta.items():
                     mask = frame["round"] == round_number
@@ -90,23 +95,62 @@ class Dataset:
                     )
                     source = sources.get(str(column), str(column))
                     series = frame.loc[mask, column]
-                    if normalize_missing:
-                        codes = metadata.missing_codes(meta, source)
-                        if codes:
-                            series = series.where(~series.isin(codes), pd.NA)
-                    if labels:
-                        mapping = metadata.value_labels(meta, source)
-                        if mapping:
-                            series = metadata.decode_column(series, mapping)
+                    if question is not None:
+                        entry = question.rounds.get(round_number)
+                        concept_codes = (
+                            set(entry.missing) if entry is not None else set()
+                        )
+                        if normalize_missing:
+                            concept_codes.update(
+                                metadata.missing_codes(meta, source)
+                            )
+                        if concept_codes:
+                            series = series.where(
+                                ~series.isin(concept_codes), pd.NA
+                            )
+                        if labels:
+                            series = metadata.decode_column(series, question.values)
+                    else:
+                        if normalize_missing:
+                            source_codes = metadata.missing_codes(meta, source)
+                            if source_codes:
+                                series = series.where(
+                                    ~series.isin(source_codes), pd.NA
+                                )
+                        if labels:
+                            mapping = metadata.value_labels(meta, source)
+                            if mapping:
+                                series = metadata.decode_column(series, mapping)
                     result.loc[mask] = series.tolist()
                 frame[column] = result
             return cast(pd.DataFrame, frame)
         for column in frame.columns:
+            question = questions.get(str(column))
+            if question is not None:
+                if question.kind == "text":
+                    continue
+                concept_missing = sorted(
+                    {
+                        code
+                        for entry in question.rounds.values()
+                        if not entry.exclude
+                        for code in entry.missing
+                    }
+                )
+                series = frame[column]
+                if concept_missing:
+                    series = series.where(~series.isin(concept_missing), pd.NA)
+                if labels:
+                    series = metadata.decode_column(series, question.values)
+                frame[column] = series
+                continue
             source = self._source(str(column))
             if normalize_missing:
-                codes = metadata.missing_codes(self._meta, source)
-                if codes:
-                    frame[column] = frame[column].where(~frame[column].isin(codes), pd.NA)
+                source_codes = metadata.missing_codes(self._meta, source)
+                if source_codes:
+                    frame[column] = frame[column].where(
+                        ~frame[column].isin(source_codes), pd.NA
+                    )
             if labels:
                 mapping = metadata.value_labels(self._meta, source)
                 if mapping:

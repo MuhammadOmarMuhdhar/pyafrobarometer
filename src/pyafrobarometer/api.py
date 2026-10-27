@@ -27,12 +27,14 @@ from pyafrobarometer.errors import (
 )
 from pyafrobarometer.harmonize import canonical as harmonize
 from pyafrobarometer.harmonize.crosswalk import (
+    LEGACY_QUESTIONS,
     canonical_map,
     family_descriptions,
     family_map,
+    question_map,
 )
 from pyafrobarometer.harmonize.panel import concat_frames
-from pyafrobarometer.harmonize.schema import resolve_column
+from pyafrobarometer.harmonize.schema import QuestionDefinition, resolve_column
 from pyafrobarometer.names import normalize_country
 
 ROUND_COLUMNS = ["round", "year", "countries", "data_url", "codebook_url", "language"]
@@ -291,16 +293,25 @@ def _select_usecols(
         actual_within = resolve_column("withinwt_hh", names)
         if actual_within is not None:
             needed.add(actual_within)
-        families = family_map()
+        questions = question_map()
         selected = (
-            list(families)
+            list(LEGACY_QUESTIONS)
             if variables is None
-            else [name for name in variables if name in families]
+            else [name for name in variables if name in questions]
         )
-        for family in selected:
-            spec = families[family].get(round_number)
-            if spec is not None:
-                actual = resolve_column(spec.var, names)
+        for name in selected:
+            entry = questions[name].rounds.get(round_number)
+            if entry is None or entry.exclude or entry.var is None:
+                continue
+            actual = resolve_column(entry.var, names)
+            if actual is not None:
+                needed.add(actual)
+        if variables is not None:
+            known = set(questions) | set(canonical_map())
+            for variable in variables:
+                if variable in known:
+                    continue
+                actual = resolve_column(variable, names)
                 if actual is not None:
                     needed.add(actual)
     elif variables is not None:
@@ -356,20 +367,27 @@ def _load_one(
             frame, round_number=round_number, meta=meta
         )
         source_map.update(canonical_sources)
-        families = family_map()
+        questions = question_map()
         known_canonical = set(canonical_map())
         if variables is None:
-            requested_families = [
+            requested_questions = [
                 name
-                for name, rounds in families.items()
-                if round_number in rounds
-                and resolve_column(rounds[round_number].var, frame.columns) is not None
+                for name in LEGACY_QUESTIONS
+                if name in questions
+                and round_number in questions[name].rounds
+                and not questions[name].rounds[round_number].exclude
+                and resolve_column(
+                    questions[name].rounds[round_number].var or "", frame.columns
+                )
+                is not None
             ]
         else:
             unknown = [
                 name
                 for name in variables
-                if name not in families and name not in known_canonical
+                if name not in questions
+                and name not in known_canonical
+                and resolve_column(name, frame.columns) is None
             ]
             missing_canonical = [
                 name
@@ -384,14 +402,14 @@ def _load_one(
                 if strict:
                     raise HarmonizationError(message)
                 warnings.warn(message, UserWarning, stacklevel=3)
-            requested_families = [name for name in variables if name in families]
-        frame, family_sources = harmonize.apply_families(
+            requested_questions = [name for name in variables if name in questions]
+        frame, question_sources = harmonize.apply_questions(
             frame,
             round_number=round_number,
-            families=requested_families,
+            questions=requested_questions,
             strict=strict,
         )
-        source_map.update(family_sources)
+        source_map.update(question_sources)
     elif variables is not None:
         missing = [name for name in variables if name not in frame.columns]
         if missing:
@@ -430,23 +448,66 @@ def _merge_meta(metas: list[dict[str, Any]]) -> dict[str, Any]:
     return merged
 
 
-def _build_variables(meta: dict[str, Any], source_map: dict[str, str]) -> pd.DataFrame:
+def _concept_missing(question: QuestionDefinition) -> list[int]:
+    return sorted(
+        {
+            code
+            for entry in question.rounds.values()
+            if not entry.exclude
+            for code in entry.missing
+        }
+    )
+
+
+def _build_variables(
+    meta: dict[str, Any],
+    source_map: dict[str, str],
+    round_source_map: dict[int, dict[str, str]] | None = None,
+) -> pd.DataFrame:
     variables = metadata.variable_info(meta)
     variables["source_var"] = variables["name"]
+    variables["source_vars"] = pd.Series(
+        [{} for _ in range(len(variables))],
+        dtype=object,
+        index=variables.index,
+    )
     labels_by_name = dict(zip(variables["name"], variables["label"], strict=False))
     descriptions = family_descriptions()
+    questions = question_map()
+    round_sources = round_source_map or {}
     for output, source in source_map.items():
+        question = questions.get(output)
+        source_vars = {
+            round_number: mapping[output]
+            for round_number, mapping in sorted(round_sources.items())
+            if output in mapping
+        }
         mask = variables["name"] == output
         if bool(mask.any()):
-            variables.loc[mask, "source_var"] = source
+            index = variables.index[mask][0]
+            variables.at[index, "source_var"] = source
+            variables.at[index, "source_vars"] = cast(Any, source_vars)
             continue
-        row = {
-            "name": output,
-            "label": labels_by_name.get(source, descriptions.get(output, output)),
-            "value_labels": metadata.value_labels(meta, source),
-            "missing_codes": metadata.missing_codes(meta, source),
-            "source_var": source,
-        }
+        if question is not None:
+            row = {
+                "name": output,
+                "label": question.description,
+                "value_labels": dict(question.values),
+                "missing_codes": _concept_missing(question),
+                "source_var": (
+                    source_vars[min(source_vars)] if source_vars else source
+                ),
+                "source_vars": source_vars,
+            }
+        else:
+            row = {
+                "name": output,
+                "label": labels_by_name.get(source, descriptions.get(output, output)),
+                "value_labels": metadata.value_labels(meta, source),
+                "missing_codes": metadata.missing_codes(meta, source),
+                "source_var": source,
+                "source_vars": source_vars,
+            }
         variables = pd.concat([variables, pd.DataFrame([row])], ignore_index=True)
     return variables
 
@@ -655,7 +716,7 @@ def load(
         raise NotFoundError("No data matched the requested rounds and countries")
     combined = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True)
     meta = _merge_meta(metas)
-    variable_frame = _build_variables(meta, source_map)
+    variable_frame = _build_variables(meta, source_map, round_source_map)
     provenance = Provenance(
         source_urls=tuple(source_urls),
         retrieved_at=_timestamp(),
@@ -771,7 +832,14 @@ def panel(
         ).reset_index(drop=True)
     else:
         variables_frame = pd.DataFrame(
-            columns=["name", "label", "value_labels", "missing_codes", "source_var"]
+            columns=[
+                "name",
+                "label",
+                "value_labels",
+                "missing_codes",
+                "source_var",
+                "source_vars",
+            ]
         )
     provenance = Provenance(
         source_urls=tuple(
