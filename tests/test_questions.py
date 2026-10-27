@@ -3,7 +3,12 @@ import pytest
 
 from pyafrobarometer.errors import HarmonizationError
 from pyafrobarometer.harmonize import canonical
-from pyafrobarometer.harmonize.crosswalk import family_map, family_rounds
+from pyafrobarometer.harmonize.crosswalk import (
+    LEGACY_QUESTIONS,
+    family_map,
+    family_rounds,
+    question_map,
+)
 
 
 def test_verified_family_mappings():
@@ -74,3 +79,16 @@ def test_mapped_variable_absent_has_specific_message():
     df = pd.DataFrame({"Q40": [0]})
     with pytest.raises(HarmonizationError, match="absent"):
         canonical.apply_families(df, round_number=9, families=["trust_president"])
+
+
+def test_question_map_reads_questions_section():
+    q = question_map()
+    assert q["trust_president"].kind == "coded"
+    assert q["trust_president"].values[0] == "Not at all"
+    assert q["trust_president"].rounds[2].var.lower() == "q43a"
+
+
+def test_legacy_names_are_preserved():
+    q = question_map()
+    assert "trust_president" in q
+    assert len(LEGACY_QUESTIONS) == 32

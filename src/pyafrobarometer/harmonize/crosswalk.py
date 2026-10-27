@@ -4,13 +4,49 @@ from __future__ import annotations
 
 import importlib.resources
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 import yaml
 
 from pyafrobarometer.errors import HarmonizationError
+from pyafrobarometer.harmonize.schema import QuestionDefinition, parse_questions
 
 SUPPORTED_ROUNDS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+LEGACY_QUESTIONS = (
+    "trust_president",
+    "trust_parliament",
+    "trust_police",
+    "trust_courts",
+    "trust_electoral_commission",
+    "trust_army",
+    "trust_ruling_party",
+    "trust_opposition",
+    "support_democracy",
+    "reject_one_party_rule",
+    "reject_military_rule",
+    "reject_one_man_rule",
+    "satisfaction_democracy",
+    "corruption_president",
+    "corruption_police",
+    "corruption_judges",
+    "bribe_police",
+    "radio_news",
+    "television_news",
+    "newspaper_news",
+    "internet_news",
+    "social_media_news",
+    "internet_use",
+    "econ_country_present",
+    "econ_personal_present",
+    "lived_poverty_food",
+    "lived_poverty_water",
+    "lived_poverty_medical",
+    "lived_poverty_fuel",
+    "free_to_say",
+    "felt_unsafe_walking",
+    "neighbours_homosexuals",
+)
 
 _MISSING = object()
 
@@ -77,36 +113,35 @@ def canonical_map() -> dict[str, dict[int, Mapping]]:
     return result
 
 
-def family_map() -> dict[str, dict[int, Mapping]]:
+@lru_cache(maxsize=1)
+def _question_map_cached() -> dict[str, QuestionDefinition]:
     config = _load("crosswalk/questions.yaml")
-    section = config.get("families")
-    if not isinstance(section, dict):
-        raise HarmonizationError("questions.yaml has no families section")
+    if "questions" not in config:
+        raise HarmonizationError(
+            "questions.yaml has no questions section; run the migration generator"
+        )
+    return parse_questions(config)
+
+
+def question_map() -> dict[str, QuestionDefinition]:
+    return dict(_question_map_cached())
+
+
+def family_map() -> dict[str, dict[int, Mapping]]:
     result: dict[str, dict[int, Mapping]] = {}
-    for family, spec in section.items():
-        if not isinstance(spec, dict):
-            raise HarmonizationError(f"family {family!r} is not a mapping")
-        rounds_raw = spec.get("rounds")
-        if not isinstance(rounds_raw, dict):
-            raise HarmonizationError(f"family {family!r} has no rounds mapping")
+    for name, question in question_map().items():
         rounds: dict[int, Mapping] = {}
-        for key, value in rounds_raw.items():
-            if isinstance(value, str):
-                rounds[int(key)] = Mapping(var=value)
-            elif isinstance(value, dict):
-                variable = value.get("var")
-                if not isinstance(variable, str) or not variable:
-                    raise HarmonizationError(
-                        f"family {family!r} round {key} has no var"
-                    )
-                rounds[int(key)] = Mapping(
-                    var=variable, recode=_recode_map(value.get("recode"))
-                )
-            else:
-                raise HarmonizationError(
-                    f"family {family!r} round {key} must be a string or mapping"
-                )
-        result[str(family)] = rounds
+        for round_number, entry in question.rounds.items():
+            if entry.exclude or entry.var is None:
+                continue
+            recode = {
+                code: target
+                for code, target in entry.recode.items()
+                if target is not None
+            }
+            rounds[round_number] = Mapping(var=entry.var, recode=recode or None)
+        if rounds:
+            result[name] = rounds
     return result
 
 
@@ -117,13 +152,12 @@ def family_rounds(family: str) -> list[int]:
     return sorted(rounds)
 
 
+def question_descriptions() -> dict[str, str]:
+    return {
+        name: question.description
+        for name, question in question_map().items()
+    }
+
+
 def family_descriptions() -> dict[str, str]:
-    config = _load("crosswalk/questions.yaml")
-    section = config.get("families")
-    if not isinstance(section, dict):
-        raise HarmonizationError("questions.yaml has no families section")
-    descriptions: dict[str, str] = {}
-    for family, spec in section.items():
-        description = spec.get("description") if isinstance(spec, dict) else None
-        descriptions[str(family)] = str(description or "")
-    return descriptions
+    return question_descriptions()
