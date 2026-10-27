@@ -53,11 +53,36 @@ def test_exact_groups_across_rounds_become_one_candidate():
     assert candidate.exact is True
 
 
+def test_canonical_source_variables_are_skipped():
+    index = pd.DataFrame(
+        [
+            row("gender", "Gender", 8, {1: "Male", 2: "Female"}),
+            row("gender", "Gender", 9, {1: "Male", 2: "Female"}),
+            {
+                "name": "gender",
+                "label": "Gender",
+                "round": 9,
+                "kind": "canonical",
+                "value_labels": "{}",
+                "missing_codes": [],
+            },
+        ]
+    )
+    assert mod.build_candidates(index, fuzzy_threshold=None) == []
+
+
+def test_singleton_groups_are_skipped():
+    index = pd.DataFrame([row("Q1", "Only once", 9, {0: "No"})])
+    assert mod.build_candidates(index, fuzzy_threshold=None) == []
+
+
 def test_duplicate_slugs_get_suffix():
     index = pd.DataFrame(
         [
-            row("A", "The president", 9, {0: "No", 1: "Yes"}),
-            row("B", "President", 10, {0: "No", 1: "Yes"}),
+            row("A8", "The president", 8, {0: "No", 1: "Yes"}),
+            row("A9", "The president", 9, {0: "No", 1: "Yes"}),
+            row("B8", "President", 8, {0: "No", 1: "Yes"}),
+            row("B9", "President", 9, {0: "No", 1: "Yes"}),
         ]
     )
     names = [c.name for c in mod.build_candidates(index, fuzzy_threshold=None)]
@@ -109,6 +134,23 @@ def test_legacy_preserves_names_and_recodes():
     assert candidate.exact is False
 
 
+def test_infer_values_and_recodes_reverses_scale():
+    values, recodes = mod.infer_values_and_recodes(
+        {
+            8: {1: "Very easy", 2: "Easy", 3: "Difficult", 4: "Very difficult"},
+            9: {1: "Very difficult", 2: "Difficult", 3: "Easy", 4: "Very easy"},
+        },
+        {},
+    )
+    assert values == {
+        1: "Very difficult",
+        2: "Difficult",
+        3: "Easy",
+        4: "Very easy",
+    }
+    assert recodes[8] == {1: 4, 2: 3, 3: 2, 4: 1}
+
+
 def test_infer_values_returns_none_for_different_code_sets():
     assert (
         mod.infer_values(
@@ -143,12 +185,14 @@ def test_fuzzy_merges_wording_variants():
     index = pd.DataFrame(
         [
             row("Q41A", "Trust the president", 8, {0: "No", 1: "Yes"}),
-            row("Q37A", "Trust in the president", 9, {0: "No", 1: "Yes"}),
+            row("Q37A", "Trust the president", 9, {0: "No", 1: "Yes"}),
+            row("Q52A", "Trust in the president", 6, {0: "No", 1: "Yes"}),
+            row("Q43A", "Trust in the president", 7, {0: "No", 1: "Yes"}),
         ]
     )
     candidates = mod.build_candidates(index)
     assert len(candidates) == 1
-    assert set(candidates[0].rounds) == {8, 9}
+    assert set(candidates[0].rounds) == {6, 7, 8, 9}
     assert candidates[0].exact is False
 
 
@@ -272,6 +316,38 @@ def test_validate_reports_bad_var_and_returns_one(tmp_path, capsys):
     output = capsys.readouterr()
     assert code == 1
     assert "NOPE" in output.out + output.err
+
+
+def test_strict_coverage_ignores_canonical_variables(tmp_path):
+    index_path = tmp_path / "index.json"
+    write_index(
+        index_path,
+        [
+            row("Q101", "Gender of respondent", 8, {1: "Male", 2: "Female"}),
+            row("Q101", "Gender of respondent", 9, {1: "Male", 2: "Female"}),
+            {
+                "name": "Q101",
+                "label": "Gender",
+                "round": 9,
+                "kind": "canonical",
+                "value_labels": "{}",
+                "missing_codes": [],
+            },
+        ],
+    )
+    truth = tmp_path / "questions.yaml"
+    truth.write_text("version: 1\nquestions: {}\n")
+    code = mod.main(
+        [
+            "--validate",
+            "--strict-coverage",
+            "--index",
+            str(index_path),
+            "--questions",
+            str(truth),
+        ]
+    )
+    assert code == 0
 
 
 def test_strict_coverage_fails_unassigned_repeated_label(tmp_path):

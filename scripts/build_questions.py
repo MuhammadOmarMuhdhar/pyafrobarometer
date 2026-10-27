@@ -307,6 +307,62 @@ def _legacy_candidate(
     )
 
 
+
+
+def _match_label(label: str, target: Mapping[int, str]) -> int | None:
+    normalized = normalize_value_label(label)
+    for code, candidate in sorted(target.items()):
+        if normalize_value_label(candidate) == normalized:
+            return code
+    try:
+        from rapidfuzz import fuzz
+    except ImportError:
+        return None
+    best_code: int | None = None
+    best_score = 0.0
+    for code, candidate in target.items():
+        score = float(fuzz.WRatio(normalized, normalize_value_label(candidate)))
+        if score > best_score:
+            best_score = score
+            best_code = code
+    return best_code if best_score >= 88.0 else None
+
+
+def infer_values_and_recodes(
+    rounds: Mapping[int, Mapping[int, str]],
+    missing: Mapping[int, Iterable[int]],
+) -> tuple[dict[int, str] | None, dict[int, dict[int, int | None]] | None]:
+    recoded: dict[int, dict[int, str]] = {}
+    for round_number, labels in rounds.items():
+        values = _recode_labels(labels, missing.get(round_number, ()), None)
+        if values:
+            recoded[round_number] = values
+    if not recoded:
+        return None, None
+    latest = max(recoded)
+    target = recoded[latest]
+    recodes: dict[int, dict[int, int | None]] = {}
+    for round_number, values in recoded.items():
+        if round_number == latest:
+            recodes[round_number] = {}
+            continue
+        mapping: dict[int, int | None] = {}
+        mapped = 0
+        for code, label in values.items():
+            target_code = _match_label(label, target)
+            mapping[code] = target_code
+            if target_code is not None:
+                mapped += 1
+        if mapped == 0:
+            return None, None
+        recodes[round_number] = {
+            code: target_code
+            for code, target_code in mapping.items()
+            if target_code != code
+        }
+    return dict(target), recodes
+
+
 def _group_candidate(
     label: str,
     items: list[Mapping[str, Any]],
@@ -328,9 +384,19 @@ def _group_candidate(
             "recode": {},
             "missing": missing[round_number],
         }
-    values = infer_values(labels, missing)
-    signatures = _signatures(labels, missing, None)
-    exact = bool(signatures) and len(set(signatures)) == 1 and all(signatures)
+    values, recodes = infer_values_and_recodes(labels, missing)
+    if recodes is not None:
+        for round_number, recode in recodes.items():
+            payload_rounds[round_number]["recode"] = recode
+    signatures = _signatures(labels, missing, recodes)
+    identity = recodes is not None and all(not recode for recode in recodes.values())
+    exact = (
+        values is not None
+        and identity
+        and bool(signatures)
+        and len(set(signatures)) == 1
+        and all(signatures)
+    )
     description = str(items[-1].get("label")) if items else label
     return Candidate(
         name=slugify(label),
@@ -398,6 +464,11 @@ def build_candidates(
     fuzzy_threshold: float | None = 90.0,
 ) -> list[Candidate]:
     rows = _row_map(index)
+    canonical_vars = {
+        str(row.get("name", "")).casefold()
+        for row in index.to_dict("records")
+        if str(row.get("kind")) == "canonical"
+    }
     legacy_map = dict(legacy or {})
     used: set[tuple[int, str]] = set()
     candidates: list[Candidate] = []
@@ -417,6 +488,8 @@ def build_candidates(
             continue
         if (round_number, name.casefold()) in used:
             continue
+        if name.casefold() in canonical_vars:
+            continue
         groups.setdefault(normalize_label(row.get("label")), []).append(row)
 
     for label, items in sorted(groups.items()):
@@ -426,6 +499,8 @@ def build_candidates(
             if _as_int(item.get("round")) is not None
         ]
         if not rounds or len(rounds) != len(set(rounds)):
+            continue
+        if len(set(rounds)) < 2:
             continue
         candidates.append(_group_candidate(label, items))
 
@@ -572,6 +647,11 @@ def unassigned_repeated_labels(
                 if parsed is not None and isinstance(var, str):
                     assigned.add((parsed, var.casefold()))
 
+    canonical_vars = {
+        str(row.get("name", "")).casefold()
+        for row in index.to_dict("records")
+        if str(row.get("kind")) == "canonical"
+    }
     groups: dict[str, list[tuple[int, str]]] = {}
     for row in index.to_dict("records"):
         if str(row.get("kind")) != "question":
@@ -579,6 +659,8 @@ def unassigned_repeated_labels(
         round_number = _as_int(row.get("round"))
         name = row.get("name")
         if round_number is None or not isinstance(name, str):
+            continue
+        if name.casefold() in canonical_vars:
             continue
         groups.setdefault(normalize_label(row.get("label")), []).append(
             (round_number, name)
