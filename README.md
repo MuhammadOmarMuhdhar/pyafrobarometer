@@ -38,8 +38,11 @@ import pyafrobarometer as ab
 # Which merged rounds exist?
 print(ab.rounds()[["round", "year", "language", "data_url"]])
 
-# Which comparative question families are shipped?
-print(ab.families()[["family", "rounds"]])
+# Which comparative question concepts are shipped?
+print(ab.questions()[["name", "rounds"]])
+
+# Per-round source variables, recodes, and missing codes for one concept.
+print(ab.question("trust_president"))
 
 # Load one round with metadata intact.
 ds = ab.load(rounds=9)
@@ -47,7 +50,7 @@ print(ds)
 print(ds.variables().head())
 print(ds.to_pandas(normalize_missing=True).head())
 
-# Add canonical columns and harmonized question families.
+# Add canonical columns and harmonized question concepts.
 ds = ab.load(rounds=9, harmonize=True)
 print(ds.to_pandas()[["country", "age", "trust_president"]].head())
 
@@ -71,12 +74,19 @@ returns a copy; mutating it never mutates the dataset.
   `urban_rural`, `age`, `gender`, `education`, `interview_date`) are mapped per
   round from a curated YAML crosswalk. A mapping that cannot be verified is
   omitted with a warning, never guessed.
-- Question families are sparse by design. For example, `social_media_news` is
-  available from Round 6, `trust_army` is missing in Round 4, and Round 1
+- Question concepts are sparse by design. For example, `social_media_news` is
+  available from Round 6, `trust_army` is missing in Round 4, and some Round 1
   institutional-trust items are recoded from the 1–4 scale to 0–3.
-- `ab.families()` reports each family's available rounds and source variables.
-  `strict=True` (the default) raises `HarmonizationError` when a requested family
-  is unavailable; `strict=False` adds a missing column of `pd.NA` and warns.
+- `ab.questions()` lists every reviewed concept and `ab.question(name)` shows
+  the per-round source variable, wording, recodes, and missing codes. The
+  reviewed YAML is the sole source of truth; see the
+  [master codebook](https://muhammadomarmuhdhar.github.io/pyafrobarometer/guide/master-codebook/).
+- With `harmonize=True`, `strict=True` (the default) raises
+  `HarmonizationError` when a requested concept is unavailable; `strict=False`
+  adds a missing column of `pd.NA` and warns. Missing and recoded-to-`null`
+  categories become `pd.NA` even without `normalize_missing=True`.
+- `ab.families()` remains for the original 32 names but is deprecated in favour
+  of `ab.questions()` and `ab.question()`.
 
 ## Value labels and missing codes
 
@@ -84,6 +94,10 @@ returns a copy; mutating it never mutates the dataset.
 `ds.to_pandas(normalize_missing=True)` replaces declared missing codes (`8`, `9`,
 `97`, `98`, `99`, `-1`, and their metadata variants) with `pd.NA`. Default loads
 keep the raw numeric codes.
+
+Harmonized question concepts are different: their declared `missing` codes and
+`recode: null` categories always become `pd.NA`, and `labels=True` uses the
+concept's target labels so codes mean the same thing in every round.
 
 ## Caching, TTL, and offline use
 

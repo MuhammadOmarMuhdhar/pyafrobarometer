@@ -18,7 +18,8 @@ not exist in the round is handled according to `strict`.
 
 ## Harmonized variables
 
-With `harmonize=True`, names may be question families or canonical variables:
+With `harmonize=True`, names may be canonical variables, question concepts, or
+raw variables:
 
 ```python
 clean = ab.load(
@@ -44,25 +45,31 @@ ds = ab.load(rounds=9, variables=["Q37A", "NOT_A_VARIABLE"], strict=False)
 - `strict=True` (default) raises `HarmonizationError`.
 - `strict=False` warns and keeps the columns that exist.
 
-With harmonization enabled, an unavailable family in a round becomes a `pd.NA`
+With harmonization enabled, an unavailable concept in a round becomes a `pd.NA`
 column when `strict=False`. A completely unknown name is warned about and is not
 added.
 
-## Selecting all families
+## Default harmonized columns
 
-Omit `variables=` with `harmonize=True` to add every family available in the
-round:
+Omit `variables=` with `harmonize=True` to add canonical variables plus the
+original 32 concept names:
 
 ```python
 ds = ab.load(rounds=9, harmonize=True)
-print(ds.variables()[["name", "source_var"]])
+print(ds.variables()[["name", "source_var", "source_vars"]])
 ```
 
-This can produce many columns. Select explicitly when you know what you need.
+The full catalog is much larger. Use `ab.questions()` to find the concept you need
+and request it explicitly; this avoids hundreds of automatic columns.
+
+```python
+print(ab.questions()[["name", "rounds"]].head())
+```
 
 ## See also
 
 - [Loading a round](loading.md)
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
+- [Master codebook](master-codebook.md)
 - [Canonical variables](canonical-variables.md)
 - [`load()`](../reference/functions.md#load)

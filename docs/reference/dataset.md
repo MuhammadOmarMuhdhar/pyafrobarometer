@@ -50,8 +50,15 @@ ds.variables() -> pandas.DataFrame
 ```
 
 Return a copy of the variable metadata with the columns `name`, `label`,
-`value_labels`, `missing_codes`, and `source_var`. Harmonized columns appear with
-the source variable they came from.
+`value_labels`, `missing_codes`, `source_var`, and `source_vars`. Harmonized
+columns appear with the source variable they came from.
+
+For a question concept:
+
+- `value_labels` is the concept's target codebook.
+- `missing_codes` is the union across included rounds.
+- `source_var` is the earliest included round's source variable.
+- `source_vars` is the round-to-variable mapping.
 
 ```python
 print(ds.variables().head())
@@ -66,8 +73,12 @@ ds.to_pandas(labels: bool = False, normalize_missing: bool = False) -> pandas.Da
 Return a copy of the frame, optionally decoding value labels and normalizing
 missing codes.
 
-- `labels=True` replaces numeric codes with label text.
+- `labels=True` replaces numeric codes with label text. Harmonized coded
+  concepts use their target labels; canonical and raw columns use per-round
+  metadata. `kind: text` concepts are never decoded.
 - `normalize_missing=True` replaces declared missing codes with `pd.NA`.
+  Harmonized concepts force their declared missing codes to `pd.NA` even when
+  this flag is false.
 
 When the dataset spans multiple rounds, metadata is applied per round.
 

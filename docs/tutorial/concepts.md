@@ -58,15 +58,17 @@ population. The package exposes a canonical `weight` column, preferring
 `withinwt_hh` when present. Weighted means are usually more appropriate than
 unweighted means for cross-country comparisons.
 
-## Question families
+## Question concepts
 
 Because variable names change across rounds, the package defines **question
-families** with stable names such as `trust_president`. A family maps each round
-to its source variable and any recoding needed. Families are sparse: a family may
-exist in Rounds 2–10 but not Round 1.
+concepts** with stable names such as `trust_president`. A concept maps each round
+to its source variable, wording, recodes, and missing codes. Concepts are sparse:
+one may exist in Rounds 2–10 but not Round 1.
 
-`families()` reports availability and source variables. Passing
-`harmonize=True` with `variables=["trust_president"]` adds the harmonized column.
+`questions()` lists every reviewed concept and `question(name)` shows the
+per-round details. Passing `harmonize=True` with
+`variables=["trust_president"]` adds the harmonized column. Missing and
+recoded-to-`null` categories become `pd.NA` automatically.
 
 ## Canonical variables
 

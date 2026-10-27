@@ -39,7 +39,8 @@ Requires Python 3.10 or newer. For a development install, see
 - [Afrobarometer concepts](concepts.md)
 - [Rounds and the catalog](rounds.md)
 - [Countries and coverage](countries.md)
-- [Question families](families.md)
+- [Question concepts](families.md)
+- [Master codebook](master-codebook.md)
 
 ### Loading and shaping
 
@@ -50,7 +51,7 @@ Requires Python 3.10 or newer. For a development install, see
 - [Missing codes](missing-codes.md)
 - [Weights](weights.md)
 - [Canonical variables](canonical-variables.md)
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
 - [Multi-round loads](multi-round.md)
 - [Local and remote sources](sources.md)
 

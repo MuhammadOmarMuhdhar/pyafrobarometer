@@ -1,53 +1,75 @@
-# Question families
+# Question concepts
 
-Question families give comparable survey items a stable name across rounds.
+Question concepts give every repeated survey item a stable name across rounds.
+They replace the older, 32-item "question families" layer. The concept name is
+the column you request with `harmonize=True`, and the shipped master codebook
+records the source variable, wording, recodes, and missing codes for each round.
 
 ```python
 import pyafrobarometer as ab
 
-families = ab.families()
-print(families[["family", "description", "rounds"]])
+questions = ab.questions()
+print(questions[["name", "description", "rounds"]].head())
 ```
 
 ## Columns
 
+`ab.questions()` returns one row per concept:
+
 | Column | Meaning |
 | --- | --- |
-| `family` | Harmonized column name you can request |
+| `name` | Stable concept name you can request |
 | `description` | Human-readable description |
-| `rounds` | Sorted list of rounds where the family is available |
+| `kind` | `coded` or `text` |
+| `rounds` | Sorted rounds where the concept is available |
 | `variables` | Mapping of round number to source variable |
+| `values` | Target value labels, empty for `text` concepts |
 
 ```python
-trust = families[families["family"] == "trust_president"].iloc[0]
+trust = questions[questions["name"] == "trust_president"].iloc[0]
 print(trust["rounds"])
 print(trust["variables"])
+print(trust["values"])
 ```
+
+## Inspecting one concept
+
+`ab.question(name)` is the authoritative per-round view:
+
+```python
+print(ab.question("trust_president"))
+```
+
+It returns `round`, `var`, `label`, `recode`, `missing`, `excluded`, and
+`reason`. Excluded rounds appear with `excluded=True` and a reason instead of a
+source variable.
 
 ## Sparse availability
 
-Families are sparse by design:
+Concepts are sparse by design:
 
 - `social_media_news` is available from Round 6.
 - `trust_army` is missing in Round 4.
 - `bribe_police` starts in Round 6.
-- Round 1 institutional-trust items are recoded from a 1–4 scale to 0–3.
+- Some Round 1 institutional-trust items are recoded from a 1–4 scale to 0–3.
 
-Always check `rounds` before requesting a family for a specific round.
+Always check `rounds` before requesting a concept for a specific round.
 
-## Finding a family
+## Finding a concept
 
 ```python
-families[families["family"].str.contains("trust")]
-families[families["description"].str.contains("democracy", case=False)]
+questions[questions["name"].str.contains("trust")]
+questions[questions["description"].str.contains("democracy", case=False)]
 ```
 
-For free-text search over variables, families, and labels, use
-[`search_variables()`](../reference/functions.md#search_variables).
+For free-text search over concepts, raw variables, and labels, use
+[`search_variables()`](../reference/functions.md#search_variables). Search results
+include a `concept` column, so a raw `Q37A` can be traced back to
+`trust_president`.
 
 ## Source variables
 
-The `variables` mapping tells you which raw column backs the family in each
+The `variables` mapping tells you which raw column backs the concept in each
 round. For `trust_president`:
 
 | Round | Source |
@@ -63,20 +85,31 @@ round. For `trust_president`:
 | 9 | `Q37A` |
 | 10 | `Q37A` |
 
-This is why hard-coding a source variable is fragile.
+This is why hard-coding a source variable is fragile. Variable lookup is
+case-insensitive, so Rounds 2 and 3 (`q43a`, `q80`) resolve correctly.
 
-## Adding families to a load
+## Adding concepts to a load
 
 ```python
 ds = ab.load(rounds=9, harmonize=True, variables=["trust_president"])
 ```
 
-See [Question-family harmonization](family-harmonization.md) for strict mode and
-recoding behavior.
+With `harmonize=True` and no `variables=`, the package adds canonical variables
+plus only the original 32 concepts. Request any other concept by name.
+
+See [Question harmonization](family-harmonization.md) for forced missing
+normalization, strict mode, and recoding behavior.
+
+## Deprecated `families()`
+
+`ab.families()` still works for the original 32 names, but emits
+`DeprecationWarning`. Use `ab.questions()` for the full catalog and
+`ab.question(name)` for per-round details.
 
 ## See also
 
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
+- [Master codebook](master-codebook.md)
 - [Variable search](search.md)
-- [`families()`](../reference/functions.md#families)
+- [`questions()` and `question()`](../reference/functions.md#questions)
 - [Tutorial: discover the data](../tutorial/discover.md)

@@ -59,9 +59,9 @@ The requested round, country, variable, or artifact is unavailable. Examples:
 
 ## HarmonizationError
 
-A canonical variable or question family cannot be harmonized. Examples:
+A canonical variable or question concept cannot be harmonized. Examples:
 
-- A requested family is unavailable in the round and `strict=True`.
+- A requested concept is unavailable in the round and `strict=True`.
 - A requested name is unknown and `strict=True`.
 - Harmonization is requested for a local source without `rounds=`.
 - Country filtering is requested but no country column exists.

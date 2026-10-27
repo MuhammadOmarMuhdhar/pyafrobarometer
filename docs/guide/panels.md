@@ -33,10 +33,11 @@ print(panel.provenance.years)
 - With the default `strict=True`, every requested variable must be available in
   every requested round. If one is missing, `panel()` raises
   `HarmonizationError` naming the missing variables.
-- Variable names are harmonized names: question families or canonical variables.
+- Variable names are harmonized names: question concepts or canonical variables.
 
 `strict` is passed through to each round's load. With `strict=False`, an
-unavailable family becomes a `pd.NA` column, so the panel can still be assembled.
+unavailable concept becomes a `pd.NA` column, so the panel can still be
+assembled.
 A completely unknown name is warned about and is not added, which makes the
 panel fail because the column is missing from one or more rounds.
 

@@ -24,7 +24,7 @@ round,country,mean_trust,respondents
 
 ## What you will learn
 
-- What Afrobarometer rounds, countries, variables, and question families are.
+- What Afrobarometer rounds, countries, variables, and question concepts are.
 - How to discover available data without downloading it.
 - How to load a round with metadata intact.
 - How to decode labels, normalize missing codes, and apply weights.

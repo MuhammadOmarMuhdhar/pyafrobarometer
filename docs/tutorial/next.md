@@ -7,7 +7,8 @@ That covers the core workflow. Here is where to go next.
 
 - [Guide](../guide/index.md) — every major feature explained in depth.
 - [Afrobarometer concepts](../guide/concepts.md) — the full domain primer.
-- [Question families](../guide/families.md) — find other comparable variables.
+- [Question concepts](../guide/families.md) — find other comparable variables.
+- [Master codebook](../guide/master-codebook.md) — how concepts are reviewed.
 - [Panels](../guide/panels.md) — more panel patterns.
 - [Caching and offline use](../guide/caching-and-offline.md) — reproducible runs
   without a network.

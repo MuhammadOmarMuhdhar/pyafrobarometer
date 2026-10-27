@@ -14,7 +14,9 @@ print(ab.__version__)
 | --- | --- | --- |
 | [`rounds()`](functions.md#rounds) | function | List merged rounds from the catalog |
 | [`countries()`](functions.md#countries) | function | List country names |
-| [`families()`](functions.md#families) | function | Describe harmonized question families |
+| [`questions()`](functions.md#questions) | function | Describe every reviewed question concept |
+| [`question()`](functions.md#question) | function | Show one concept's per-round details |
+| [`families()`](functions.md#families) | function | Deprecated legacy 32-name view |
 | [`load()`](functions.md#load) | function | Load one or more rounds into a `Dataset` |
 | [`panel()`](functions.md#panel) | function | Build a multi-round dataset for selected variables |
 | [`search_variables()`](functions.md#search_variables) | function | Search the shipped metadata index |
@@ -35,7 +37,7 @@ print(ab.__version__)
 ## Package version
 
 `pyafrobarometer.__version__` is the installed version string, for example
-`"0.1.0"`.
+`"0.1.2"`.
 
 ## See also
 

@@ -17,8 +17,8 @@ reuse it.
 
 - `rounds=9` selects the merged Round 9 file.
 - `harmonize=True` adds canonical columns (`country`, `age`, `weight`, …) and
-  the requested `trust_president` family.
-- `variables=["trust_president"]` limits the harmonized families to the one you
+  the requested `trust_president` concept.
+- `variables=["trust_president"]` limits the harmonized concepts to the one you
   need.
 
 `ds` is a `Dataset`, not a raw DataFrame. Its representation summarizes the

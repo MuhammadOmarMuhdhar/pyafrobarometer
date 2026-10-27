@@ -19,7 +19,7 @@ end-to-end analysis: a weighted trust-in-the-president trend exported to CSV.
   `trust_police`, `trust_parliament`, and `trust_courts`.
 - Study democratic support with `support_democracy`,
   `reject_one_party_rule`, and `satisfaction_democracy`.
-- Use `search_variables()` to discover families by label.
+- Use `search_variables()` to discover concepts by label.
 - Filter to a set of countries and compare urban and rural respondents.
 - Download a codebook to confirm question wording.
 
@@ -31,7 +31,8 @@ workflow, and for the catalog refresh process.
 ## Keep exploring
 
 - [Afrobarometer concepts](concepts.md)
-- [Question families](families.md)
+- [Question concepts](families.md)
+- [Master codebook](master-codebook.md)
 - [Panels](panels.md)
 - [Caching, TTL, and offline mode](caching-and-offline.md)
 - [Data policy](data-policy.md)

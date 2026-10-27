@@ -89,7 +89,7 @@ The following chapters cover each option:
 - [Value labels](value-labels.md)
 - [Missing codes](missing-codes.md)
 - [Canonical variables](canonical-variables.md)
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
 - [Local and remote sources](sources.md)
 
 ## See also

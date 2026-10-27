@@ -49,7 +49,7 @@ the keys `round`, `country`, and `year` and a fixed variable set, use
 
 ## Memory
 
-Loading many rounds or all families can produce a large frame. Select `variables`
+Loading many rounds or many concepts can produce a large frame. Select `variables`
 and `countries` to keep memory under control.
 
 ## See also

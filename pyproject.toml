@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyafrobarometer"
-version = "0.1.0"
+version = "0.1.2"
 description = "Programmatic access to Afrobarometer survey data."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -48,10 +48,22 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/pyafrobarometer/pyafrobarometer"
+Homepage = "https://muhammadomarmuhdhar.github.io/pyafrobarometer/"
+Documentation = "https://muhammadomarmuhdhar.github.io/pyafrobarometer/"
+Repository = "https://github.com/MuhammadOmarMuhdhar/pyafrobarometer"
+Issues = "https://github.com/MuhammadOmarMuhdhar/pyafrobarometer/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyafrobarometer"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/pyafrobarometer",
+  "/tests",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 markers = ["network: hits afrobarometer.org"]

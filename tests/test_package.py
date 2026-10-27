@@ -2,7 +2,7 @@ import pyafrobarometer as ab
 
 
 def test_version():
-    assert ab.__version__ == "0.1.0"
+    assert ab.__version__ == "0.1.2"
 
 
 def test_public_errors_are_exported():

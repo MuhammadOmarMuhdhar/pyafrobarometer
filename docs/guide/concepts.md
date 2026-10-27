@@ -1,26 +1,26 @@
 # Afrobarometer concepts
 
-This chapter explains the data model behind pyafrobarometer. Understanding these
-concepts makes the rest of the guide easier.
+If you're unfamiliar with how Afrobarometer works, this page explains the data
+model behind pyafrobarometer. Understanding these concepts makes the package much
+more intuitive.
 
 ## What Afrobarometer is
 
 Afrobarometer is a pan-African survey program that measures public opinion on
 democracy, governance, the economy, and daily life. It publishes microdata for
-researchers, with an access policy that allows free use but requires citation.
+researchers; the data are free to use but require citation.
 
-The package is an unofficial client. It downloads data and codebooks from
-`www.afrobarometer.org` into a local cache and does not redistribute them.
+The package is a third-party client, not officially affiliated with
+Afrobarometer.
 
 ## Rounds
 
-Surveys are released in **rounds**. Each round covers a set of countries and
-ships as a merged dataset plus individual country datasets. Rounds are numbered
-1–10 in the catalog.
+Afrobarometer surveys are released in **rounds** every 2–3 years, and each round
+covers a set of countries.
 
-Variable names change between rounds. Trust in the president is `trspre` in
-Round 1, `Q43A` in Round 2, and `Q37A` in Rounds 9 and 10. The package's
-crosswalk maps these names for you.
+Variable names change between rounds. For example, the trust-in-the-president
+question is `trspre` in Round 1, `Q43A` in Round 2, and `Q37A` in Rounds 9 and
+10. The package's crosswalk maps these names for you.
 
 ## Respondents and rows
 
@@ -87,22 +87,24 @@ Canonical variables give stable names to common respondent attributes:
 They are added when `harmonize=True`. See
 [Canonical variables](canonical-variables.md).
 
-## Question families
+## Question concepts
 
-Question families group comparable survey items under stable names such as
-`trust_president`, `support_democracy`, and `social_media_news`. A family maps
-each round to its source variable and any recoding. Families are sparse: a family
-may start in Round 6 or be missing in Round 4.
+Question concepts group comparable survey items under stable names such as
+`trust_president`, `support_democracy`, and `social_media_news`. A concept maps
+each round to its source variable, wording, recodes, and missing codes. Concepts
+are sparse: one may start in Round 6 or be absent in Round 4.
 
-`families()` reports availability and source variables. See
-[Question families](families.md) and
-[Question-family harmonization](family-harmonization.md).
+`questions()` reports the full catalog and `question(name)` shows every round,
+including excluded rounds. The older `families()` call still works for the
+original 32 names but is deprecated. See [Question concepts](families.md),
+[Question harmonization](family-harmonization.md), and the
+[Master codebook](master-codebook.md).
 
 ## Crosswalk guarantees
 
 Mappings come from curated YAML files shipped with the package. A mapping that
 cannot be verified is omitted with a warning; it is never guessed. Unknown
-families raise `HarmonizationError`.
+concepts raise `HarmonizationError`.
 
 ## Codebooks
 
@@ -114,8 +116,8 @@ round. Use [Codebooks](codebooks.md) when you need the authoritative definition.
 Two shipped artifacts make discovery fast:
 
 - `manifest.json` — the baked catalog of rounds and data URLs.
-- `metadata_index.json` — variable names, labels, families, and value labels for
-  merged rounds 1–10.
+- `metadata_index.json` — variable names, labels, concepts, value labels, and
+  missing codes for merged rounds 1–10.
 
 The catalog is refreshed weekly in CI. At runtime, a cached live index takes
 precedence when fresh; otherwise the baked manifest is used. See
@@ -141,14 +143,15 @@ publications and follow the access policy. See
 | Missing code | A code representing no usable answer |
 | Weight | A sampling correction factor |
 | Canonical variable | A stable column such as `country` or `age` |
-| Question family | A stable name for a comparable question across rounds |
-| Crosswalk | The mapping from families/canonical names to source variables |
+| Question concept | A stable name for a comparable question across rounds |
+| Crosswalk | The mapping from concepts/canonical names to source variables |
 | Codebook | Documentation of variables and codes |
 | Provenance | Source URLs, rounds, countries, and retrieval time |
 
 ## See also
 
 - [Rounds and the catalog](rounds.md)
-- [Question families](families.md)
+- [Question concepts](families.md)
+- [Master codebook](master-codebook.md)
 - [Canonical variables](canonical-variables.md)
 - [Tutorial: Afrobarometer concepts](../tutorial/concepts.md)

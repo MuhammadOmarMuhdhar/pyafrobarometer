@@ -33,7 +33,7 @@ Catch `ab.AfrobarometerError` to handle any package-specific failure.
 | `DownloadError` | Non-HTTPS URL, wrong host, bad content type, failed download, offline mode |
 | `CacheError` | Corrupt state, unwritable cache, lock timeout, bad zip contents |
 | `NotFoundError` | Unknown round, empty country filter, missing codebook, CSV-only page |
-| `HarmonizationError` | Unavailable family with `strict=True`, unknown name, missing country column, panel variable missing |
+| `HarmonizationError` | Unavailable concept with `strict=True`, unknown name, missing country column, panel variable missing |
 | `CodebookError` | Missing PDF link, failed download, extraction without `pypdf` |
 
 ## Handling harmonization failures
@@ -66,12 +66,12 @@ except ab.DownloadError:
 
 ## Inspecting an error message
 
-Messages name the round, variable, family, or URL involved. Print the exception
+Messages name the round, variable, concept, or URL involved. Print the exception
 to see the details.
 
 ## See also
 
 - [Errors reference](../reference/errors.md)
 - [Caching, TTL, and offline mode](caching-and-offline.md)
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
 - [Local and remote sources](sources.md)

@@ -29,6 +29,7 @@ nav = [
     "guide/rounds.md",
     "guide/countries.md",
     "guide/families.md",
+    "guide/master-codebook.md",
     "guide/loading.md",
     "guide/selecting-variables.md",
     "guide/dataset.md",

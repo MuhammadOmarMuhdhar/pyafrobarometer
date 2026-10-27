@@ -1,13 +1,13 @@
 # Variable search
 
 [`search_variables()`](../reference/functions.md#search_variables) searches the
-shipped metadata index for variable names, labels, and question families.
+shipped metadata index for variable names, labels, and question concepts.
 
 ```python
 import pyafrobarometer as ab
 
 matches = ab.search_variables("trust president", rounds=[8, 9, 10], limit=10)
-print(matches[["name", "label", "round", "family", "score"]])
+print(matches[["name", "label", "round", "concept", "score"]])
 ```
 
 Search never downloads a dataset. It reads `metadata_index.json`, which ships
@@ -22,8 +22,9 @@ job.
 | `label` | Variable label |
 | `round` | Round where the variable appears |
 | `kind` | Entry kind recorded in the index |
-| `family` | Harmonized family, when the variable belongs to one |
-| `source_var` | Source variable for the family |
+| `concept` | Stable question concept, when the variable maps to one |
+| `family` | Deprecated alias; populated only for the original 32 concepts |
+| `source_var` | Canonical name for canonical rows |
 | `score` | Match score; `100` for a substring match |
 
 Results are sorted by score and then by round, highest first.
@@ -51,18 +52,19 @@ with the result columns.
 
 ## From search to load
 
-Use the result to choose a family or source variable:
+Use the result to choose a concept or source variable:
 
 ```python
 match = ab.search_variables("trust president", rounds=9, limit=1).iloc[0]
-print(match["family"], match["name"])
+print(match["concept"], match["name"])
 
-ds = ab.load(rounds=9, harmonize=True, variables=[match["family"]])
+ds = ab.load(rounds=9, harmonize=True, variables=[match["concept"]])
 ```
 
 ## See also
 
-- [Question families](families.md)
+- [Question concepts](families.md)
+- [Master codebook](master-codebook.md)
 - [Selecting variables](selecting-variables.md)
 - [`search_variables()`](../reference/functions.md#search_variables)
 - [Installation](index.md#installation)

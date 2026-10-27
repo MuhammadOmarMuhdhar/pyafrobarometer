@@ -59,7 +59,7 @@ ds = ab.load(
 )
 ```
 
-Canonical names and question families can be mixed in `variables=`. See
+Canonical names and question concepts can be mixed in `variables=`. See
 [Selecting variables](selecting-variables.md).
 
 ## Inspecting the source mapping
@@ -72,6 +72,7 @@ print(ds.round_source_map)
 ## See also
 
 - [Weights](weights.md)
-- [Question-family harmonization](family-harmonization.md)
+- [Question harmonization](family-harmonization.md)
+- [Master codebook](master-codebook.md)
 - [`load()`](../reference/functions.md#load)
 - [Tutorial: load and inspect](../tutorial/load.md)
